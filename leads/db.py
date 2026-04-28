@@ -31,6 +31,9 @@ SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "schema.sql")
 # ---------------------------------------------------------------------------
 
 def _connect() -> sqlite3.Connection:
+    _dir = os.path.dirname(DB_PATH)
+    if _dir:
+        os.makedirs(_dir, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
