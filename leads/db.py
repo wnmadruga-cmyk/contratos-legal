@@ -85,11 +85,13 @@ def init_db() -> None:
         for col, ctype in new_cols.items():
             if col not in cols:
                 conn.execute(f"ALTER TABLE leads ADD COLUMN {col} {ctype}")
-    # Users migration: can_review
+    # Users migration: can_review (só se a tabela já existir — criada pelo db.init_db() principal)
     with db_cursor() as conn:
-        user_cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
-        if "can_review" not in user_cols:
-            conn.execute("ALTER TABLE users ADD COLUMN can_review INTEGER DEFAULT 0")
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        if "users" in tables:
+            user_cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+            if "can_review" not in user_cols:
+                conn.execute("ALTER TABLE users ADD COLUMN can_review INTEGER DEFAULT 0")
     # New tables for approvals and guard events
     # Checklist templates (named groups)
     with db_cursor() as conn:

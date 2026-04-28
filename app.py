@@ -37,6 +37,11 @@ def fromjson_filter(s):
     except Exception:
         return {}
 
+# Inicializa o banco principal ANTES dos blueprints de leads,
+# pois leads/db.init_db() faz migrações na tabela 'users' que só
+# existe após init_db() principal.
+init_db()
+
 leads_module.register(app)
 
 
@@ -165,8 +170,6 @@ if os.path.exists(_env_path):
             if _line and not _line.startswith("#") and "=" in _line:
                 _k, _v = _line.split("=", 1)
                 os.environ.setdefault(_k.strip(), _v.strip())
-
-init_db()
 
 
 # ---------------------------------------------------------------------------
