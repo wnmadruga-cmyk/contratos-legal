@@ -382,18 +382,17 @@ def _seed_defaults() -> None:
 
         # Garante escritórios (offices)
         for _pos, (_oname, _ocolor) in enumerate([
-            ("ECM",     "#3b82f6"),
-            ("Avenida", "#2c1376"),
-            ("Conceito","#ffaa00"),
-            ("Aderson", "#f5ec00"),
-            ("CRL",     "#ff6a00"),
+            ("ECM",      "#3b82f6"),
+            ("Avenida",  "#2c1376"),
+            ("Conceito", "#ffaa00"),
+            ("Aderson",  "#f5ec00"),
+            ("CRL",      "#ff6a00"),
         ]):
-            with db_cursor() as _oc:
-                if _oc.execute("SELECT COUNT(*) FROM lead_offices WHERE name=?", (_oname,)).fetchone()[0] == 0:
-                    _oc.execute(
-                        "INSERT INTO lead_offices (id,name,color,position) VALUES (?,?,?,?)",
-                        (new_id(), _oname, _ocolor, _pos),
-                    )
+            if conn.execute("SELECT COUNT(*) FROM lead_offices WHERE name=?", (_oname,)).fetchone()[0] == 0:
+                conn.execute(
+                    "INSERT INTO lead_offices (id,name,color,position) VALUES (?,?,?,?)",
+                    (new_id(), _oname, _ocolor, _pos),
+                )
 
         # Garante status personalizados
         for _pos, (_sname, _scolor) in enumerate([
@@ -401,12 +400,11 @@ def _seed_defaults() -> None:
             ("Aguardando Órgão Público", "#ed719e"),
             ("Aguardando Cliente",       "#f59e0b"),
         ], start=10):
-            with db_cursor() as _sc:
-                if _sc.execute("SELECT COUNT(*) FROM lead_statuses WHERE name=?", (_sname,)).fetchone()[0] == 0:
-                    _sc.execute(
-                        "INSERT INTO lead_statuses (id,name,color,position) VALUES (?,?,?,?)",
-                        (new_id(), _sname, _scolor, _pos),
-                    )
+            if conn.execute("SELECT COUNT(*) FROM lead_statuses WHERE name=?", (_sname,)).fetchone()[0] == 0:
+                conn.execute(
+                    "INSERT INTO lead_statuses (id,name,color,position) VALUES (?,?,?,?)",
+                    (new_id(), _sname, _scolor, _pos),
+                )
 
 
 # ---------------------------------------------------------------------------
