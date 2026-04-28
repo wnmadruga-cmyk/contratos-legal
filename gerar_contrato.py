@@ -176,7 +176,17 @@ def estado_civil_texto(socio: dict, genero: str) -> str:
     regime_key = socio.get("regimeBens", "")
     if ec_key == "casado" and regime_key:
         regime = REGIME_BENS.get(regime_key, regime_key.replace("_", " "))
-        return f"{ec_str}, sob o regime de {regime}"
+        ec_str = f"{ec_str}, sob o regime de {regime}"
+
+    # União estável: append if marked
+    uniao = socio.get("uniaoEstavel") or socio.get("uniao_estavel")
+    companheiro = (socio.get("nomeCompanheiro") or socio.get("nome_companheiro") or "").strip()
+    if uniao and str(uniao).lower() not in ("false", "0", ""):
+        if companheiro:
+            ec_str = f"{ec_str}, convivente em união estável com {companheiro}"
+        else:
+            ec_str = f"{ec_str}, convivente em união estável"
+
     return ec_str
 
 
@@ -207,17 +217,11 @@ def formatar_endereco(end: dict) -> str:
     estado_nome = ESTADOS_NOMES.get(estado, estado)
 
     partes = [f"{logradouro}, nº {num}"]
-    if quadra:
-        partes.append(f"Quadra {quadra}")
-    if lote:
-        partes.append(f"Lote {lote}")
     if compl:
         partes.append(compl)
     partes.append(bairro)
     partes.append(f"cidade de {cidade} – {estado_nome}")
     partes.append(f"CEP: {cep}")
-    if inscricao:
-        partes.append(f"Inscrição Imobiliária: {inscricao}")
     return ", ".join(partes)
 
 
@@ -640,7 +644,9 @@ def gerar_contrato(dados: dict, caminho_saida):
     for atv in atividades:
         p = doc.add_paragraph()
         set_paragraph_format(p, left_indent=INDENT_NORMAL, space_after=SPC_CNAE)
-        add_run(p, f"CNAE Nº {atv['cnae']} - {atv['descricao']}")
+        desc_raw = atv.get('descricao', '').strip()
+        desc_fmt = desc_raw.capitalize() if desc_raw else desc_raw
+        add_run(p, f"CNAE Nº {atv['cnae']} - {desc_fmt}")
 
     # --- CLÁUSULA IV ---
     p = doc.add_paragraph()

@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Leads — Kanban{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/leads/leads.css">
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h4 class="mb-0 fw-bold"><i class="bi bi-kanban"></i>
+      {% if organ_type %}{{ organ_type.name }}{% else %}Quadro de Processos{% endif %}
+    </h4>
+    <small class="text-muted">
+      {% if workflow %}{{ workflow.name }} — {{ leads|length }} processos{% else %}Sem workflow configurado{% endif %}
+    </small>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <button class="btn btn-sm btn-outline-secondary" id="toggleClosedBtn" title="Exibir/ocultar concluídos, cancelados e inativos">
+      <i class="bi bi-eye-slash"></i> <span id="toggleClosedLabel">Exibir concluídos/inativos</span>
+    </button>
+    <a href="{{ '/leads/organ/' ~ organ_code if organ_code else '/leads' }}" class="btn btn-outline-secondary"><i
+        class="bi bi-list-ul"></i> Lista</a>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newLeadModal">
+      <i class="bi bi-plus-circle"></i> Novo Processo
+    </button>
+  </div>
+</div>
+
+{% include "leads/_filters.html" %}
+
+{% if not workflows_data %}
+<div class="alert alert-warning">
+  Esse tipo ainda não tem workflow. Configure em
+  <a href="/admin/leads/tipos">Tipos & Etapas</a>.
+</div>
+{% else %}
+<div class="kanban-scroll">
+  {% for wdata in workflows_data %}
+  {% set wf = wdata.workflow %}
+  {% set wtype = wdata.type %}
+  {% set wleads = wdata.leads %}
+  {% set wmacrophases = wdata.macrophases %}
+  {% set wstages_by_macro = wdata.stages_by_macro %}
+
+  <!-- Se houver mais de um workflow (Modo "Todos"), mostramos um cabeçalho pra separar -->
+  {% if workflows_data|length > 1 %}
+  <div
+    class="kanban-swimlane-header text-uppercase fw-bold text-muted small mt-4 mb-2 pb-2 border-bottom d-flex align-items-center">
+    <span style="color: {{ wtype.color or '#475569' }}; margin-right: 8px;">●</span> {{ wtype.name }} <span
+      class="ms-2 badge bg-secondary">{{ wleads|length }} cards</span>
+  </div>
+  {% endif %}
+
+  <div class="kanban-board mb-4">
+    {% for mp in wmacrophases %}
+    <div class="kanban-macro">
+      <div class="kanban-macro-header">
+        <div class="kanban-macro-title">{{ mp.name }}</div>
+        {% if mp.sla_days %}<small class="text-muted">{{ mp.sla_days }}d total</small>{% endif %}
+      </div>
+      <div class="kanban-cols">
+        {% for st in wstages_by_macro.get(mp.id, []) %}
+        {% set stage_leads = wleads|selectattr('current_stage_id','equalto',st.id)|list %}
+        {% set hidden_leads = stage_leads|selectattr('status','equalto','Cancelado')|list + stage_leads|selectattr('status','equalto','Inativo Pedido Cliente')|list + stage_leads|selectattr('status','equalto','Concluído')|list %}
+        {% set visible_leads = stage_leads|rejectattr('status','equalto','Cancelado')|rejectattr('status','equalto','Inativo Pedido Cliente')|rejectattr('status','equalto','Concluído')|list %}
+        <div class="kanban-col" data-stage-id="{{ st.id }}">
+          <div class="kanban-col-header">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="fw-semibold small">{{ st.name }}</span>
+              <div class="d-flex align-items-center gap-1">
+                <span class="badge bg-secondary-subtle text-secondary kanban-col-count">{{ visible_leads|length }}</span>
+                {% if hidden_leads %}
+                <span class="badge bg-warning text-dark kanban-closed-badge" title="{{ hidden_leads|length }} inativos/cancelados ocultos">{{ hidden_leads|length }} ocultos</span>
+                {% endif %}
+              </div>
+            </div>
+            {% if st.sla_days %}<small class="text-muted">SLA: {{ st.sla_days }}d</small>{% endif %}
+          </div>
+          <div class="kanban-col-body" data-stage-id="{{ st.id }}" data-stage-name="{{ st.name }}">
+            {% for l in stage_leads %}
+            {% set is_closed = l.status in ('Cancelado', 'Inativo Pedido Cliente', 'Concluído') %}
+            <div class="kanban-closed-wrapper {% if is_closed %}kanban-card-closed d-none{% endif %}" data-lead-id="{{ l.id }}">
+              {% include "leads/_card.html" %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+
+    {# Etapas sem macrofase #}
+    {% set orphan_stages = wstages_by_macro.get(None, []) %}
+    {% if orphan_stages %}
+    <div class="kanban-macro">
+      <div class="kanban-macro-header">
+        <div class="kanban-macro-title text-muted">Sem macrofase</div>
+      </div>
+      <div class="kanban-cols">
+        {% for st in orphan_stages %}
+        {% set stage_leads = wleads|selectattr('current_stage_id','equalto',st.id)|list %}
+        {% set hidden_leads = stage_leads|selectattr('status','equalto','Cancelado')|list + stage_leads|selectattr('status','equalto','Inativo Pedido Cliente')|list + stage_leads|selectattr('status','equalto','Concluído')|list %}
+        <div class="kanban-col" data-stage-id="{{ st.id }}">
+          <div class="kanban-col-header">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="fw-semibold small">{{ st.name }}</span>
+              {% if hidden_leads %}
+              <span class="badge bg-warning text-dark kanban-closed-badge" title="{{ hidden_leads|length }} ocultos">{{ hidden_leads|length }} ocultos</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="kanban-col-body" data-stage-id="{{ st.id }}" data-stage-name="{{ st.name }}">
+            {% for l in stage_leads %}
+            {% set is_closed = l.status in ('Cancelado', 'Inativo Pedido Cliente', 'Concluído') %}
+            <div class="kanban-closed-wrapper {% if is_closed %}kanban-card-closed d-none{% endif %}" data-lead-id="{{ l.id }}">
+              {% include "leads/_card.html" %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% include "leads/_new_lead_modal.html" %}
+{% include "leads/_card_modal_shell.html" %}
+
+<script>
+  window.LEADS_PRIORITIES = {{ priorities | tojson }};
+  window.LEADS_STATUSES = {{ statuses | tojson }};
+
+  // Toggle closed (inactive/cancelled) cards visibility
+  (function () {
+    let showClosed = false;
+    const btn   = document.getElementById('toggleClosedBtn');
+    const label = document.getElementById('toggleClosedLabel');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      showClosed = !showClosed;
+      document.querySelectorAll('.kanban-card-closed').forEach(el => {
+        el.classList.toggle('d-none', !showClosed);
+      });
+      document.querySelectorAll('.kanban-closed-badge').forEach(el => {
+        el.style.opacity = showClosed ? '0.5' : '1';
+      });
+      if (showClosed) {
+        btn.querySelector('i').className = 'bi bi-eye';
+        label.textContent = 'Ocultar concluídos/inativos';
+        btn.classList.replace('btn-outline-secondary', 'btn-outline-warning');
+      } else {
+        btn.querySelector('i').className = 'bi bi-eye-slash';
+        label.textContent = 'Exibir concluídos/inativos';
+        btn.classList.replace('btn-outline-warning', 'btn-outline-secondary');
+      }
+    });
+  })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script src="/static/leads/leads.js"></script>
+<script src="/static/leads/dynamic-form.js"></script>
+<script src="/static/leads/card-modal.js"></script>
+<script src="/static/leads/kanban.js"></script>
+{% endblock %}

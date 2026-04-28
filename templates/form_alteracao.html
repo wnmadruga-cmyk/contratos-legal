@@ -13,6 +13,7 @@
 <form id="formAlteracao" method="POST" action="/alteracao/salvar" enctype="multipart/form-data">
   <input type="hidden" name="dados_json" id="dados_json">
   <input type="hidden" name="ficha_id" value="{{ ficha_id or '' }}">
+  <input type="hidden" name="lead_id" id="lead_id_hidden">
 
   <!-- ================================================================ -->
   <!-- UPLOAD PARA AUTO-PREENCHIMENTO -->
@@ -534,19 +535,45 @@
     <div class="card-body">
       <!-- Objeto -->
       <div class="mb-3">
-        <div class="d-flex justify-content-between align-items-center mb-1">
+        <div class="d-flex justify-content-between align-items-center mb-2">
           <label class="form-label mb-0">Novo Objeto Social</label>
-          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="gerarObjetoIA()" id="btn-ia-objeto">
-            <i class="bi bi-magic me-1"></i>Sugerir com IA
-          </button>
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-secondary active" onclick="mostrarFonteObjeto('livre', this)">Texto livre</button>
+            <button type="button" class="btn btn-outline-secondary" onclick="mostrarFonteObjeto('banco', this)">Do banco</button>
+            <button type="button" class="btn btn-outline-secondary" onclick="mostrarFonteObjeto('ia', this)">
+              <i class="bi bi-magic me-1"></i>IA
+            </button>
+          </div>
         </div>
-        <div class="mb-2">
-          <input type="text" class="form-control form-control-sm" id="ia-descricao-obj"
-                 placeholder="Descreva as atividades em linguagem simples para a IA sugerir o objeto e CNAEs...">
+        <!-- Banco de cláusulas -->
+        <div id="obj-fonte-banco" style="display:none;" class="mb-2">
+          {% if clausulas_banco %}
+          <div class="list-group" style="max-height:220px; overflow-y:auto;">
+            {% for cl in clausulas_banco %}
+            <button type="button" class="list-group-item list-group-item-action py-2"
+                    onclick="selecionarObjetoDoBanco({{ cl.corpo | tojson }})">
+              <span class="fw-semibold small">{{ cl.titulo }}</span>
+              <p class="text-muted small mb-0 mt-1">{{ cl.corpo[:100] }}{% if cl.corpo|length > 100 %}...{% endif %}</p>
+            </button>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted small">Nenhum objeto social no banco ainda. <a href="/clausulas">Adicione no banco de cláusulas.</a></p>
+          {% endif %}
+        </div>
+        <!-- IA -->
+        <div id="obj-fonte-ia" style="display:none;" class="mb-2">
+          <div class="d-flex gap-2">
+            <input type="text" class="form-control form-control-sm" id="ia-descricao-obj"
+                   placeholder="Descreva as atividades em linguagem simples para a IA sugerir o objeto e CNAEs...">
+            <button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" onclick="gerarObjetoIA()" id="btn-ia-objeto">
+              <i class="bi bi-magic me-1"></i>Gerar
+            </button>
+          </div>
+          <div id="ia-obj-status" class="small text-muted mt-1" style="display:none;"></div>
         </div>
         <textarea class="form-control" id="novo_objeto" rows="4" style="resize:vertical;"
                   placeholder="Texto formal do objeto social (preenche automaticamente ou edite)..."></textarea>
-        <div id="ia-obj-status" class="small text-muted mt-1" style="display:none;"></div>
       </div>
       <!-- CNAEs atuais (para manter/excluir) -->
       <div class="d-flex justify-content-between align-items-center mb-2">
@@ -893,7 +920,15 @@
         <select class="form-select" data-field="estadoCivil" onchange="toggleRegimeBensA(this)">
           <option value="solteiro">Solteiro(a)</option><option value="casado">Casado(a)</option>
           <option value="divorciado">Divorciado(a)</option><option value="viuvo">Viúvo(a)</option>
-        </select></div>
+        </select>
+        <div class="form-check mt-1">
+          <input class="form-check-input" type="checkbox" data-field="uniaoEstavel" id="uniaoEstavelA___IDX__"
+            onchange="toggleUniaoEstavelA(this)">
+          <label class="form-check-label small text-muted" for="uniaoEstavelA___IDX__">União estável</label>
+        </div>
+      </div>
+      <div class="col-md-3 uniao-estavel-field" style="display:none;"><label class="form-label">Nome do(a) companheiro(a)</label>
+        <input type="text" class="form-control" data-field="nomeCompanheiro" placeholder="Nome completo"></div>
       <div class="col-md-3 regime-bens-field" style="display:none;"><label class="form-label">Regime de Bens</label>
         <select class="form-select" data-field="regimeBens">
           <option value="comunhao_parcial">Comunhão Parcial</option>
@@ -991,6 +1026,13 @@
 
 {% block scripts %}
 <script>
+// Popula lead_id a partir de ?lead_id= na URL
+(function() {
+  var p = new URLSearchParams(window.location.search);
+  var lid = p.get('lead_id');
+  if (lid) document.getElementById('lead_id_hidden').value = lid;
+})();
+
 // ============================================================
 // Estado global
 // ============================================================
@@ -1446,6 +1488,12 @@ function adicionarSocioNovo(dados) {
     setField(div, 'genero',          dados.genero || 'masculino');
     setField(div, 'nacionalidade',   dados.nacionalidade || 'brasileira');
     setField(div, 'estadoCivil',     dados.estadoCivil || 'solteiro');
+    const uniaoCheckN = div.querySelector('[data-field="uniaoEstavel"]');
+    if (uniaoCheckN) {
+      uniaoCheckN.checked = !!(dados.uniaoEstavel);
+      toggleUniaoEstavelA(uniaoCheckN);
+      if (dados.uniaoEstavel) setField(div, 'nomeCompanheiro', dados.nomeCompanheiro || '');
+    }
     setField(div, 'profissao',       dados.profissao || '');
     setField(div, 'quantidadeCotas', dados.quantidadeCotas || '');
     setField(div, 'valorUnitarioCota', dados.valorUnitarioCota || 1);
@@ -1759,6 +1807,27 @@ function adicionarAtivNova(dados) {
 }
 
 // ============================================================
+// Objeto Social — seleção de fonte (livre / banco / IA)
+// ============================================================
+function mostrarFonteObjeto(tipo, btn) {
+  ['banco', 'ia'].forEach(t => {
+    const el = document.getElementById('obj-fonte-' + t);
+    if (el) el.style.display = t === tipo ? '' : 'none';
+  });
+  btn.closest('.btn-group').querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function selecionarObjetoDoBanco(corpo) {
+  document.getElementById('novo_objeto').value = corpo;
+  // Volta para modo livre para que o usuário veja/edite o texto
+  const bts = document.querySelectorAll('[onclick^="mostrarFonteObjeto"]');
+  bts.forEach(b => {
+    if (b.getAttribute('onclick').includes("'livre'")) b.click();
+  });
+}
+
+// ============================================================
 // IA — Objeto Social
 // ============================================================
 async function gerarObjetoIA() {
@@ -1775,7 +1844,12 @@ async function gerarObjetoIA() {
     });
     const d = await resp.json();
     if (d.erro) throw new Error(d.erro);
-    if (d.objetoSocial) document.getElementById('novo_objeto').value = d.objetoSocial;
+    if (d.objetoSocial) {
+      document.getElementById('novo_objeto').value = d.objetoSocial;
+      // Switch to free-text view so user sees the result
+      const livreBtn = document.querySelector('[onclick="mostrarFonteObjeto(\'livre\', this)"]');
+      if (livreBtn) livreBtn.click();
+    }
     // Limpa e preenche atividades novas
     document.getElementById('atividades-novas-container').innerHTML = '';
     idxAtivNova = 0;
@@ -1785,7 +1859,7 @@ async function gerarObjetoIA() {
   } catch(e) {
     status.textContent = '✗ Erro: ' + e.message;
   } finally {
-    btn.disabled = false; btn.innerHTML = '<i class="bi bi-magic me-1"></i>Sugerir com IA';
+    btn.disabled = false; btn.innerHTML = '<i class="bi bi-magic me-1"></i>Gerar';
   }
 }
 
@@ -1911,6 +1985,18 @@ function toggleRegimeBensA(select) {
   const cont  = select.closest('.socio-card');
   const campo = cont?.querySelector('.regime-bens-field');
   if (campo) campo.style.display = select.value === 'casado' ? '' : 'none';
+}
+
+function toggleUniaoEstavelA(checkbox) {
+  const parent = checkbox.closest('.col-md-2');
+  const campo  = parent ? parent.nextElementSibling : null;
+  if (campo && campo.classList.contains('uniao-estavel-field')) {
+    campo.style.display = checkbox.checked ? '' : 'none';
+    if (!checkbox.checked) {
+      const inp = campo.querySelector('[data-field="nomeCompanheiro"]');
+      if (inp) inp.value = '';
+    }
+  }
 }
 
 // toggleOrigemCotas / preencherCedentesNoCard removidos — ingresso é sempre aumento de capital
@@ -2297,6 +2383,8 @@ function coletarSociosAtuais() {
       dataNascimento: getFieldVal(cont, 'dataNascimento'),
       genero:         getFieldVal(cont, 'genero'),
       estadoCivil:    getFieldVal(cont, 'estadoCivil'),
+      uniaoEstavel:   !!(cont.querySelector('[data-field="uniaoEstavel"]')?.checked),
+      nomeCompanheiro: getFieldVal(cont, 'nomeCompanheiro'),
       regimeBens:     '',
       profissao:      getFieldVal(cont, 'profissao'),
       nacionalidade:  getFieldVal(cont, 'nacionalidade') || 'brasileira',
@@ -2339,6 +2427,8 @@ function coletarSociosNovos() {
       dataNascimento: getFieldVal(cont, 'dataNascimento'),
       genero:         getFieldVal(cont, 'genero'),
       estadoCivil:    getFieldVal(cont, 'estadoCivil'),
+      uniaoEstavel:   !!(cont.querySelector('[data-field="uniaoEstavel"]')?.checked),
+      nomeCompanheiro: getFieldVal(cont, 'nomeCompanheiro'),
       regimeBens:     getFieldVal(cont, 'regimeBens'),
       profissao:      getFieldVal(cont, 'profissao'),
       nacionalidade:  getFieldVal(cont, 'nacionalidade') || 'brasileira',

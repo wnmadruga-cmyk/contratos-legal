@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Usuários — ECM Registro{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="mb-0 fw-bold">Usuários do Sistema</h4>
+    <small class="text-muted">Gerencie os acessos ao sistema</small>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoUsuario">
+    <i class="bi bi-person-plus me-1"></i> Novo Usuário
+  </button>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Perfil</th>
+            <th>Status</th>
+            <th class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr class="{% if not u.active %}text-muted{% endif %}">
+            <td class="fw-semibold">{{ u.name }}</td>
+            <td>{{ u.email }}</td>
+            <td>
+              {% if u.profile == 'admin' %}
+                <span class="badge bg-danger">Administrador</span>
+              {% elif u.profile == 'gerente' %}
+                <span class="badge bg-primary">Gerente</span>
+              {% else %}
+                <span class="badge bg-secondary">Operacional</span>
+              {% endif %}
+              {% if u.can_review %}
+                <span class="badge bg-info text-dark ms-1" title="Pode revisar conferência interna">Revisor</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if u.active %}
+                <span class="badge bg-success">Ativo</span>
+              {% else %}
+                <span class="badge bg-light text-muted border">Inativo</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm">
+                <a href="/admin/usuarios/{{ u.id }}/editar" class="btn btn-outline-secondary" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {% if u.active and u.id != session.get('user_id') %}
+                <button type="button" class="btn btn-outline-warning"
+                  onclick="inativarUsuario('{{ u.id }}', '{{ u.name | e }}')" title="Inativar">
+                  <i class="bi bi-person-dash"></i>
+                </button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Novo Usuário -->
+<div class="modal fade" id="modalNovoUsuario" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/admin/usuarios">
+        <div class="modal-header">
+          <h6 class="modal-title"><i class="bi bi-person-plus me-2"></i>Novo Usuário</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Nome completo <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">E-mail <span class="text-danger">*</span></label>
+            <input type="email" name="email" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Senha <span class="text-danger">*</span></label>
+            <input type="password" name="senha" class="form-control" minlength="6" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Perfil</label>
+            <select name="profile" class="form-select">
+              <option value="operacional">Operacional</option>
+              <option value="gerente">Gerente</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="can_review" value="1" id="canReviewNew">
+              <label class="form-check-label small" for="canReviewNew">
+                Pode revisar conferência interna
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-check-lg me-1"></i> Criar Usuário
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal inativar -->
+<div class="modal fade" id="modalInativar" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title text-warning"><i class="bi bi-person-dash me-2"></i>Inativar Usuário</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">Inativar <strong id="inativar-nome"></strong>? O usuário não conseguirá mais fazer login.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <form id="formInativar" method="POST" class="d-inline">
+          <button type="submit" class="btn btn-warning btn-sm">Inativar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function inativarUsuario(uid, name) {
+  document.getElementById('inativar-nome').textContent = name;
+  document.getElementById('formInativar').action = '/admin/usuarios/' + uid + '/inativar';
+  new bootstrap.Modal(document.getElementById('modalInativar')).show();
+}
+</script>
+{% endblock %}

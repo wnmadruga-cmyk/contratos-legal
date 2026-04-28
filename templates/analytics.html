@@ -1,0 +1,555 @@
+{% extends "base.html" %}
+{% block title %}Painel Analítico{% endblock %}
+
+{% block content %}
+<style>
+  .kpi-card { border-radius: 14px; padding: 1.25rem 1.5rem; color: #fff; position: relative; overflow: hidden; }
+  .kpi-card .kpi-icon { font-size: 2.2rem; opacity: .25; position: absolute; right: 1rem; top: .75rem; }
+  .kpi-card .kpi-value { font-size: 2rem; font-weight: 700; line-height: 1; }
+  .kpi-card .kpi-label { font-size: .78rem; opacity: .85; margin-top: .25rem; }
+  .kpi-card .kpi-delta { font-size: .75rem; margin-top: .35rem; }
+  .kpi-card .kpi-delta.up   { color: #a7f3d0; }
+  .kpi-card .kpi-delta.down { color: #fca5a5; }
+  .kpi-card .kpi-delta.neutral { color: rgba(255,255,255,.65); }
+  .kpi-blue    { background: linear-gradient(135deg,#2456a4,#3b82f6); }
+  .kpi-green   { background: linear-gradient(135deg,#059669,#10b981); }
+  .kpi-red     { background: linear-gradient(135deg,#b91c1c,#ef4444); }
+  .kpi-orange  { background: linear-gradient(135deg,#b45309,#f59e0b); }
+  .kpi-purple  { background: linear-gradient(135deg,#6d28d9,#8b5cf6); }
+  .kpi-slate   { background: linear-gradient(135deg,#334155,#64748b); }
+  .chart-box { background:#fff; border-radius:14px; padding:1.25rem; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+  .attn-table th { font-size:.75rem; text-transform:uppercase; letter-spacing:.5px; color:#6c757d; font-weight:600; border-top:none; }
+  .attn-table td { font-size:.84rem; vertical-align:middle; }
+  .badge-dias { font-size:.72rem; padding:.25em .55em; border-radius:20px; }
+  .section-head { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#64748b; margin: 1.75rem 0 .6rem; }
+  .priority-tag { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
+  .tab-btn { cursor:pointer; padding:.3rem .85rem; border-radius:20px; font-size:.82rem; border:1px solid #dee2e6; background:#fff; }
+  .tab-btn.active { background:#2456a4; color:#fff; border-color:#2456a4; }
+  .attn-alert { border-left:4px solid; padding:.65rem 1rem; border-radius:0 8px 8px 0; font-size:.84rem; }
+  .attn-alert.danger { border-color:#ef4444; background:#fef2f2; }
+  .attn-alert.warning { border-color:#f59e0b; background:#fffbeb; }
+  .delta-arrow { font-size:.9rem; }
+  .comp-bar { height:6px; border-radius:3px; background:#e2e8f0; margin-top:4px; }
+  .comp-bar-fill { height:100%; border-radius:3px; }
+</style>
+
+<!-- Header -->
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line me-2 text-primary"></i>Painel Analítico</h4>
+    <small class="text-muted">Visão gerencial completa de processos</small>
+  </div>
+  <!-- Filter bar -->
+  <form method="get" action="/leads/painel" class="d-flex align-items-center gap-2 flex-wrap">
+    <select name="mes" class="form-select form-select-sm" style="width:110px">
+      {% for m in months %}
+      <option value="{{ m.value }}" {% if m.value|int == sel_month %}selected{% endif %}>{{ m.label }}</option>
+      {% endfor %}
+    </select>
+    <select name="ano" class="form-select form-select-sm" style="width:90px">
+      {% for y in years %}
+      <option value="{{ y }}" {% if y == sel_year %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Filtrar</button>
+    <a href="/leads/painel" class="btn btn-sm btn-outline-secondary">Hoje</a>
+  </form>
+</div>
+
+<!-- ===== KPI Cards ===== -->
+<div class="row g-3 mb-3">
+  {% set delta_c = data.created_mes - data.created_prev %}
+  {% set delta_f = data.finalizados_mes - data.finalizados_prev %}
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="kpi-card kpi-blue h-100">
+      <i class="bi bi-folder2-open kpi-icon"></i>
+      <div class="kpi-value">{{ data.created_mes }}</div>
+      <div class="kpi-label">Abertos no mês</div>
+      <div class="kpi-delta {% if delta_c > 0 %}up{% elif delta_c < 0 %}down{% else %}neutral{% endif %}">
+        {% if delta_c > 0 %}<span class="delta-arrow">↑</span> +{{ delta_c }}{% elif delta_c < 0 %}<span class="delta-arrow">↓</span> {{ delta_c }}{% else %}= mesmo que anterior{% endif %} vs mês anterior
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="kpi-card kpi-green h-100">
+      <i class="bi bi-check-circle kpi-icon"></i>
+      <div class="kpi-value">{{ data.finalizados_mes }}</div>
+      <div class="kpi-label">Concluídos no mês</div>
+      <div class="kpi-delta {% if delta_f > 0 %}up{% elif delta_f < 0 %}down{% else %}neutral{% endif %}">
+        {% if delta_f > 0 %}<span class="delta-arrow">↑</span> +{{ delta_f }}{% elif delta_f < 0 %}<span class="delta-arrow">↓</span> {{ delta_f }}{% else %}= mesmo que anterior{% endif %} vs mês anterior
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="kpi-card kpi-purple h-100">
+      <i class="bi bi-hourglass-split kpi-icon"></i>
+      <div class="kpi-value">{{ data.total_ativos }}</div>
+      <div class="kpi-label">Em andamento (total)</div>
+      <div class="kpi-delta neutral">{{ data.total_all }} total cadastrado</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="kpi-card kpi-red h-100">
+      <i class="bi bi-exclamation-triangle kpi-icon"></i>
+      <div class="kpi-value">{{ data.total_atrasados }}</div>
+      <div class="kpi-label">Atrasados (prazo total)</div>
+      {% if data.total_atrasados_cnpj or data.total_atrasados_nf %}
+      <div class="kpi-delta neutral" style="font-size:.68rem;">
+        🏛️ CNPJ: {{ data.total_atrasados_cnpj }}
+        &nbsp;·&nbsp;
+        🧾 NF: {{ data.total_atrasados_nf }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="kpi-card kpi-orange h-100">
+      <i class="bi bi-bell kpi-icon"></i>
+      <div class="kpi-value">{{ data.total_urgentes }}</div>
+      <div class="kpi-label">Prioridade Urgente</div>
+      <div class="kpi-delta neutral">atenção imediata</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="kpi-card kpi-slate h-100">
+      <i class="bi bi-pie-chart kpi-icon"></i>
+      <div class="kpi-value">
+        {% if data.total_all > 0 %}{{ ((data.total_concluidos_all / data.total_all) * 100)|round(0)|int }}%{% else %}0%{% endif %}
+      </div>
+      <div class="kpi-label">Taxa de Conclusão</div>
+      <div class="kpi-delta neutral">{{ data.total_concluidos_all }} de {{ data.total_all }} total</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Charts Row ===== -->
+<div class="row g-3 mb-3">
+  <!-- Tendência 12 meses -->
+  <div class="col-md-8">
+    <div class="chart-box h-100">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="fw-semibold small">Tendência — últimos 12 meses</span>
+        <span class="badge bg-light text-muted small">Abertos vs Concluídos</span>
+      </div>
+      <canvas id="chartTrend" height="90"></canvas>
+    </div>
+  </div>
+  <!-- Por tipo -->
+  <div class="col-md-4">
+    <div class="chart-box h-100">
+      <div class="fw-semibold small mb-3">Distribuição por Tipo</div>
+      <canvas id="chartTipo" height="170"></canvas>
+      <div id="legendTipo" class="mt-2"></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <!-- Por macrofase -->
+  <div class="col-md-6">
+    <div class="chart-box h-100">
+      <div class="fw-semibold small mb-3">Processos ativos por Macrofase</div>
+      <canvas id="chartMacro" height="120"></canvas>
+    </div>
+  </div>
+  <!-- Por responsável -->
+  <div class="col-md-6">
+    <div class="chart-box h-100">
+      <div class="fw-semibold small mb-3">Processos ativos por Responsável</div>
+      <canvas id="chartResp" height="120"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Seção de Atenção ===== -->
+<div class="section-head"><i class="bi bi-exclamation-circle me-1"></i>Requer atenção imediata</div>
+
+{% if data.sem_retorno_list %}
+<div class="attn-alert danger mb-3">
+  <strong><i class="bi bi-person-x me-1"></i>{{ data.sem_retorno_list|length }} processo(s) aguardando retorno do cliente</strong>
+  — cliente não respondeu em 3+ dias
+</div>
+{% endif %}
+{% if data.total_urgentes > 0 %}
+<div class="attn-alert warning mb-3">
+  <strong><i class="bi bi-bell me-1"></i>{{ data.total_urgentes }} processo(s) com prioridade URGENTE</strong>
+  — revisar e tomar ação imediata
+</div>
+{% endif %}
+
+<!-- Tabs de tabelas -->
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <button class="tab-btn active" onclick="showTab('atrasados',this)">
+    <i class="bi bi-clock-history me-1"></i>Atrasados <span class="badge bg-danger ms-1">{{ data.atrasados_list|length }}</span>
+  </button>
+  <button class="tab-btn" onclick="showTab('sem_retorno',this)">
+    <i class="bi bi-person-x me-1"></i>Sem retorno cliente <span class="badge bg-secondary ms-1">{{ data.sem_retorno_list|length }}</span>
+  </button>
+  <button class="tab-btn" onclick="showTab('parados',this)">
+    <i class="bi bi-pause-circle me-1"></i>Parados na etapa <span class="badge bg-secondary ms-1">{{ data.parados_list|length }}</span>
+  </button>
+  <button class="tab-btn" onclick="showTab('antigos',this)">
+    <i class="bi bi-calendar3 me-1"></i>Mais antigos <span class="badge bg-secondary ms-1">{{ data.mais_antigos_list|length }}</span>
+  </button>
+  <button class="tab-btn" onclick="showTab('retrabalho',this)">
+    <i class="bi bi-arrow-counterclockwise me-1"></i>Retrabalho <span class="badge bg-secondary ms-1">{{ data.rework_list|length }}</span>
+  </button>
+  <button class="tab-btn" onclick="showTab('reprovados',this)">
+    <i class="bi bi-x-circle me-1"></i>Reprovados <span class="badge bg-secondary ms-1">{{ data.reprovados_list|length }}</span>
+  </button>
+</div>
+
+<!-- Tab: Atrasados -->
+<div id="tab-atrasados" class="tab-content-block">
+  {% if data.atrasados_list %}
+  <div class="table-responsive">
+    <table class="table attn-table align-middle">
+      <thead>
+        <tr>
+          <th>Processo</th><th>Tipo</th><th>Responsável</th><th>Etapa atual</th>
+          <th>🏛️ CNPJ</th><th>🧾 NF</th><th>📋 Total</th><th>Prioridade</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in data.atrasados_list %}
+        <tr>
+          <td><a href="/leads/{{ l.id }}" class="text-decoration-none fw-semibold text-dark">{{ l.name }}</a></td>
+          <td><span class="badge" style="background:{{ l.type_color }};font-size:.7rem;">{{ l.type_name }}</span></td>
+          <td>{{ l.responsible_name or '—' }}</td>
+          <td>
+            <span class="text-muted small">{{ l.macrophase_name or '' }}</span><br>
+            <span class="small">{{ l.stage_name or '—' }}</span>
+          </td>
+          <td>
+            {% if l.dias_atraso_cnpj %}
+              <span class="badge badge-dias bg-danger">{{ l.dias_atraso_cnpj }}d atraso</span>
+            {% else %}
+              <span class="small text-muted">{{ l.due_date_junta or '—' }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if l.dias_atraso_nf %}
+              <span class="badge badge-dias bg-warning text-dark">{{ l.dias_atraso_nf }}d atraso</span>
+            {% else %}
+              <span class="small text-muted">{{ l.due_date_nf or '—' }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if l.dias_atraso %}
+              <span class="badge badge-dias bg-danger">{{ l.dias_atraso }}d</span>
+            {% else %}
+              <span class="small text-muted">{{ l.due_date or '—' }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% set pcol = {'Urgente':'#ef4444','Alta':'#f59e0b','Normal':'#3b82f6','Baixa':'#94a3b8'} %}
+            <span class="priority-tag" style="background:{{ pcol.get(l.priority,'#94a3b8') }};width:10px;height:10px;display:inline-block;border-radius:50%;"></span>
+            {{ l.priority }}
+          </td>
+          <td><a href="/leads/{{ l.id }}" class="btn btn-xs btn-outline-primary" style="font-size:.72rem;padding:.15rem .5rem;">Ver</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-4"><i class="bi bi-check2-circle fs-3 d-block mb-2"></i>Nenhum processo atrasado.</div>
+  {% endif %}
+</div>
+
+<!-- Tab: Sem retorno -->
+<div id="tab-sem_retorno" class="tab-content-block d-none">
+  {% if data.sem_retorno_list %}
+  <div class="table-responsive">
+    <table class="table attn-table align-middle">
+      <thead>
+        <tr><th>Processo</th><th>Tipo</th><th>Responsável</th><th>Etapa (aguardando cliente)</th><th>Dias aguardando</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for l in data.sem_retorno_list %}
+        <tr>
+          <td><a href="/leads/{{ l.id }}" class="text-decoration-none fw-semibold text-dark">{{ l.name }}</a></td>
+          <td><span class="badge" style="background:{{ l.type_color }};font-size:.7rem;">{{ l.type_name }}</span></td>
+          <td>{{ l.responsible_name or '—' }}</td>
+          <td>{{ l.stage_name or '—' }}</td>
+          <td>
+            <span class="badge badge-dias {% if l.dias_aguardando > 7 %}bg-danger{% elif l.dias_aguardando > 3 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+              {{ l.dias_aguardando }}d
+            </span>
+          </td>
+          <td><a href="/leads/{{ l.id }}" class="btn btn-xs btn-outline-primary" style="font-size:.72rem;padding:.15rem .5rem;">Ver</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-4"><i class="bi bi-person-check fs-3 d-block mb-2"></i>Nenhum processo aguardando retorno do cliente.</div>
+  {% endif %}
+</div>
+
+<!-- Tab: Parados -->
+<div id="tab-parados" class="tab-content-block d-none">
+  {% if data.parados_list %}
+  <div class="table-responsive">
+    <table class="table attn-table align-middle">
+      <thead>
+        <tr><th>Processo</th><th>Tipo</th><th>Responsável</th><th>Etapa atual</th><th>SLA etapa</th><th>Dias na etapa</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for l in data.parados_list %}
+        <tr>
+          <td><a href="/leads/{{ l.id }}" class="text-decoration-none fw-semibold text-dark">{{ l.name }}</a></td>
+          <td><span class="badge" style="background:{{ l.type_color }};font-size:.7rem;">{{ l.type_name }}</span></td>
+          <td>{{ l.responsible_name or '—' }}</td>
+          <td>
+            <span class="text-muted small">{{ l.macrophase_name or '' }}</span><br>
+            <span class="small">{{ l.stage_name or '—' }}</span>
+          </td>
+          <td>
+            {% if l.stage_sla %}<span class="small text-muted">{{ l.stage_sla }}d</span>{% else %}—{% endif %}
+          </td>
+          <td>
+            {% set over = l.stage_sla and l.dias_na_etapa > l.stage_sla %}
+            <span class="badge badge-dias {% if over %}bg-danger{% elif l.dias_na_etapa > 5 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+              {{ l.dias_na_etapa }}d
+            </span>
+            {% if over %}<span class="text-danger small ms-1">+{{ l.dias_na_etapa - l.stage_sla }}d</span>{% endif %}
+          </td>
+          <td><a href="/leads/{{ l.id }}" class="btn btn-xs btn-outline-primary" style="font-size:.72rem;padding:.15rem .5rem;">Ver</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-4">Nenhum processo parado.</div>
+  {% endif %}
+</div>
+
+<!-- Tab: Mais antigos -->
+<div id="tab-antigos" class="tab-content-block d-none">
+  {% if data.mais_antigos_list %}
+  <div class="table-responsive">
+    <table class="table attn-table align-middle">
+      <thead>
+        <tr><th>Processo</th><th>Tipo</th><th>Responsável</th><th>Macrofase</th><th>Etapa atual</th><th>Dias aberto</th><th>Prazo</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for l in data.mais_antigos_list %}
+        <tr>
+          <td><a href="/leads/{{ l.id }}" class="text-decoration-none fw-semibold text-dark">{{ l.name }}</a></td>
+          <td><span class="badge" style="background:{{ l.type_color }};font-size:.7rem;">{{ l.type_name }}</span></td>
+          <td>{{ l.responsible_name or '—' }}</td>
+          <td class="small text-muted">{{ l.macrophase_name or '—' }}</td>
+          <td class="small">{{ l.stage_name or '—' }}</td>
+          <td><span class="badge badge-dias {% if l.dias_aberto > 90 %}bg-danger{% elif l.dias_aberto > 45 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ l.dias_aberto }}d</span></td>
+          <td class="small {% if l.due_date and l.due_date < today.isoformat() %}text-danger fw-semibold{% endif %}">{{ l.due_date or '—' }}</td>
+          <td><a href="/leads/{{ l.id }}" class="btn btn-xs btn-outline-primary" style="font-size:.72rem;padding:.15rem .5rem;">Ver</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-4">Nenhum processo ativo.</div>
+  {% endif %}
+</div>
+
+<!-- Tab: Retrabalho -->
+<div id="tab-retrabalho" class="tab-content-block d-none">
+  {% if data.rework_list %}
+  <div class="table-responsive">
+    <table class="table attn-table align-middle">
+      <thead>
+        <tr><th>Processo</th><th>Tipo</th><th>Responsável</th><th>Etapa atual</th><th>Retrabalhos</th><th>Última ocorrência</th><th>Justificativa</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for l in data.rework_list %}
+        <tr>
+          <td><a href="/leads/{{ l.lead_id }}" class="text-decoration-none fw-semibold text-dark">{{ l.name }}</a></td>
+          <td><span class="badge" style="background:{{ l.type_color }};font-size:.7rem;">{{ l.type_name }}</span></td>
+          <td>{{ l.responsible_name or '—' }}</td>
+          <td class="small">{{ l.stage_name or '—' }}</td>
+          <td><span class="badge bg-danger">{{ l.rework_count }}x</span></td>
+          <td class="small text-muted">{{ l.last_rework[:10] if l.last_rework else '—' }}</td>
+          <td class="small text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ l.ultima_justificativa or '' }}">{{ (l.ultima_justificativa or '—')[:60] }}</td>
+          <td><a href="/leads/{{ l.lead_id }}" class="btn btn-xs btn-outline-primary" style="font-size:.72rem;padding:.15rem .5rem;">Ver</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-4"><i class="bi bi-arrow-counterclockwise fs-3 d-block mb-2"></i>Nenhum retrabalho registrado.</div>
+  {% endif %}
+</div>
+
+<!-- Tab: Reprovados -->
+<div id="tab-reprovados" class="tab-content-block d-none">
+  {% if data.reprovados_list %}
+  <div class="table-responsive">
+    <table class="table attn-table align-middle">
+      <thead>
+        <tr><th>Processo</th><th>Tipo</th><th>Responsável</th><th>Etapa atual</th><th>Reprovações</th><th>Última</th><th>Justificativa</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for l in data.reprovados_list %}
+        <tr>
+          <td><a href="/leads/{{ l.lead_id }}" class="text-decoration-none fw-semibold text-dark">{{ l.name }}</a></td>
+          <td><span class="badge" style="background:{{ l.type_color }};font-size:.7rem;">{{ l.type_name }}</span></td>
+          <td>{{ l.responsible_name or '—' }}</td>
+          <td class="small">{{ l.stage_name or '—' }}</td>
+          <td><span class="badge bg-danger">{{ l.reject_count }}x</span></td>
+          <td class="small text-muted">{{ l.last_reject[:10] if l.last_reject else '—' }}</td>
+          <td class="small text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ l.ultima_justificativa or '' }}">{{ (l.ultima_justificativa or '—')[:60] }}</td>
+          <td><a href="/leads/{{ l.lead_id }}" class="btn btn-xs btn-outline-primary" style="font-size:.72rem;padding:.15rem .5rem;">Ver</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-4"><i class="bi bi-x-circle fs-3 d-block mb-2"></i>Nenhuma reprovação registrada.</div>
+  {% endif %}
+</div>
+
+<!-- ===== Por Responsável — KPI de Produtividade ===== -->
+{% if data.by_responsible %}
+<div class="section-head"><i class="bi bi-people me-1"></i>Produtividade por Responsável</div>
+<div class="row g-2">
+  {% for r in data.by_responsible %}
+  <div class="col-md-6 col-xl-4">
+    <div class="chart-box p-3">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="fw-semibold small">{{ r.name }}</span>
+        <span class="badge bg-primary">{{ r.cnt }} processos</span>
+      </div>
+      {% if r.atrasados and r.atrasados > 0 %}
+      <div class="d-flex justify-content-between small text-muted mb-1">
+        <span>Atrasados</span>
+        <span class="text-danger fw-semibold">{{ r.atrasados }}</span>
+      </div>
+      {% endif %}
+      <div class="comp-bar">
+        {% set pct = ((r.cnt / data.total_ativos * 100)|round(0)|int) if data.total_ativos > 0 else 0 %}
+        <div class="comp-bar-fill bg-primary" style="width:{{ pct }}%"></div>
+      </div>
+      <div class="text-muted" style="font-size:.7rem;margin-top:2px;">{{ pct }}% do total ativo</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div style="height:2rem;"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// ---------- DATA ----------
+const trend = {{ data.trend | tojson }};
+const byTipo = {{ data.by_type_active | tojson }};
+const byMacro = {{ data.by_macrophase | tojson }};
+const byResp = {{ data.by_responsible | tojson }};
+
+// ---------- Chart defaults ----------
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+Chart.defaults.font.size = 11;
+
+// ---------- Trend (line) ----------
+new Chart(document.getElementById('chartTrend'), {
+  type: 'bar',
+  data: {
+    labels: trend.map(t => t.label),
+    datasets: [
+      { label: 'Abertos', data: trend.map(t => t.abertos),
+        backgroundColor: 'rgba(59,130,246,.7)', borderColor: '#3b82f6', borderWidth:1, borderRadius:4 },
+      { label: 'Concluídos', data: trend.map(t => t.concluidos),
+        backgroundColor: 'rgba(16,185,129,.7)', borderColor: '#10b981', borderWidth:1, borderRadius:4 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true,
+    plugins: { legend: { position: 'top', labels: { boxWidth: 12, padding: 10 } } },
+    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+  }
+});
+
+// ---------- Por Tipo (doughnut) ----------
+const COLORS = ['#2456a4','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#64748b'];
+if (byTipo.length > 0) {
+  new Chart(document.getElementById('chartTipo'), {
+    type: 'doughnut',
+    data: {
+      labels: byTipo.map(t => t.name),
+      datasets: [{ data: byTipo.map(t => t.cnt),
+        backgroundColor: byTipo.map((t,i) => t.color || COLORS[i % COLORS.length]),
+        borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}` } }
+      }
+    }
+  });
+  const legendEl = document.getElementById('legendTipo');
+  byTipo.forEach((t, i) => {
+    const dot = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${t.color || COLORS[i%COLORS.length]};margin-right:5px;"></span>`;
+    legendEl.innerHTML += `<div class="d-flex align-items-center gap-1 small mb-1">${dot}${t.name} <span class="ms-auto text-muted">${t.cnt}</span></div>`;
+  });
+} else {
+  document.getElementById('chartTipo').parentElement.innerHTML += '<p class="text-center text-muted small">Sem dados.</p>';
+}
+
+// ---------- Por Macrofase (horizontal bar) ----------
+if (byMacro.length > 0) {
+  new Chart(document.getElementById('chartMacro'), {
+    type: 'bar',
+    data: {
+      labels: byMacro.map(m => m.name),
+      datasets: [{ label: 'Processos', data: byMacro.map(m => m.cnt),
+        backgroundColor: COLORS, borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+  });
+}
+
+// ---------- Por Responsável (bar) ----------
+if (byResp.length > 0) {
+  new Chart(document.getElementById('chartResp'), {
+    type: 'bar',
+    data: {
+      labels: byResp.map(r => r.name.length > 18 ? r.name.substring(0,16)+'…' : r.name),
+      datasets: [
+        { label: 'Ativos', data: byResp.map(r => r.cnt),
+          backgroundColor: '#2456a4', borderRadius: 4 },
+        { label: 'Atrasados', data: byResp.map(r => r.atrasados || 0),
+          backgroundColor: '#ef4444', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { boxWidth: 10, padding: 8 } } },
+      scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+  });
+}
+
+// ---------- Tabs ----------
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-content-block').forEach(el => el.classList.add('d-none'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.remove('d-none');
+  btn.classList.add('active');
+}
+</script>
+{% endblock %}

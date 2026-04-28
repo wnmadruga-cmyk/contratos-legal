@@ -1,0 +1,42 @@
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link {% if request.path == '/admin/leads/tipos' %}active{% endif %}" href="/admin/leads/tipos">
+            Serviços & Etapas
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path == '/admin/leads/escritorios' %}active{% endif %}"
+            href="/admin/leads/escritorios">
+            Escritórios
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path == '/admin/leads/prioridades' %}active{% endif %}"
+            href="/admin/leads/prioridades">
+            Prioridades
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path == '/admin/leads/status' %}active{% endif %}" href="/admin/leads/status">
+            Status
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path == '/admin/leads/etiquetas' %}active{% endif %}"
+            href="/admin/leads/etiquetas">
+            Etiquetas
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path == '/admin/leads/checklists' %}active{% endif %}"
+            href="/admin/leads/checklists">
+            <i class="bi bi-check2-square me-1"></i>Modelos de Checklist
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path == '/admin/leads/manuais' %}active{% endif %}"
+            href="/admin/leads/manuais">
+            <i class="bi bi-book me-1"></i>Manuais por Estado
+        </a>
+    </li>
+</ul>

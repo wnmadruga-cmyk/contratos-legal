@@ -15,6 +15,7 @@
 <form id="formConstituicao" method="POST" action="/constituicao/salvar">
   <input type="hidden" name="dados_json" id="dados_json">
   <input type="hidden" name="ficha_id" value="{{ ficha_id or '' }}">
+  <input type="hidden" name="lead_id" id="lead_id_hidden">
 
   <!-- ================================================================ -->
   <!-- SÓCIOS (primeiro) -->
@@ -393,6 +394,15 @@
             <option value="viuvo">Viúvo(a)</option>
             <option value="separado">Separado(a)</option>
           </select>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" data-field="uniaoEstavel" id="uniaoEstavel___IDX__"
+              onchange="toggleUniaoEstavel(this)">
+            <label class="form-check-label small text-muted" for="uniaoEstavel___IDX__">Convivente em união estável</label>
+          </div>
+        </div>
+        <div class="col-md-3 uniao-estavel-field" style="display:none;">
+          <label class="form-label">Nome do(a) companheiro(a)</label>
+          <input type="text" class="form-control" data-field="nomeCompanheiro" placeholder="Nome completo do(a) companheiro(a)">
         </div>
         <div class="col-md-3 regime-bens-field" style="display:none;">
           <label class="form-label">Regime de Bens</label>
@@ -762,6 +772,13 @@
 
 {% block scripts %}
 <script>
+// Popula lead_id a partir de ?lead_id= na URL
+(function() {
+  var p = new URLSearchParams(window.location.search);
+  var lid = p.get('lead_id');
+  if (lid) document.getElementById('lead_id_hidden').value = lid;
+})();
+
 // ============================================================
 // Estado
 // ============================================================
@@ -1262,6 +1279,12 @@ function preencherSocio(idx, dados) {
   setField(cont, 'nacionalidade',   dados.nacionalidade || 'brasileira');
   setField(cont, 'estadoCivil',     dados.estadoCivil || 'solteiro');
   setField(cont, 'regimeBens',      dados.regimeBens || '');
+  const uniaoCheck = cont.querySelector('[data-field="uniaoEstavel"]');
+  if (uniaoCheck) {
+    uniaoCheck.checked = !!(dados.uniaoEstavel);
+    toggleUniaoEstavel(uniaoCheck);
+    if (dados.uniaoEstavel) setField(cont, 'nomeCompanheiro', dados.nomeCompanheiro || '');
+  }
   setField(cont, 'quantidadeCotas', dados.quantidadeCotas || '');
   setField(cont, 'valorUnitarioCota', dados.valorUnitarioCota || 1);
 
@@ -1324,6 +1347,20 @@ function toggleRegimeBens(select) {
   const cont  = select.closest('.socio-card');
   const campo = cont ? cont.querySelector('.regime-bens-field') : null;
   if (campo) campo.style.display = select.value === 'casado' ? '' : 'none';
+}
+
+function toggleUniaoEstavel(checkbox) {
+  const cont  = checkbox.closest('.socio-card') || checkbox.closest('.representante-container') || checkbox.parentElement.closest('[class]');
+  // Look for the sibling .uniao-estavel-field col
+  const parent = checkbox.closest('.col-md-3');
+  const campo  = parent ? parent.nextElementSibling : null;
+  if (campo && campo.classList.contains('uniao-estavel-field')) {
+    campo.style.display = checkbox.checked ? '' : 'none';
+    if (!checkbox.checked) {
+      const inp = campo.querySelector('[data-field="nomeCompanheiro"]');
+      if (inp) inp.value = '';
+    }
+  }
 }
 
 function toggleTipoAdm(checkbox) {
@@ -1513,6 +1550,8 @@ document.getElementById('formConstituicao').addEventListener('submit', function(
       genero: cont.querySelector('input[data-field="genero"]')?.value || 'masculino',
       nacionalidade: getFieldVal(cont, 'nacionalidade') || 'brasileira',
       estadoCivil: getFieldVal(cont, 'estadoCivil'),
+      uniaoEstavel: !!(cont.querySelector('[data-field="uniaoEstavel"]')?.checked),
+      nomeCompanheiro: getFieldVal(cont, 'nomeCompanheiro'),
       regimeBens: getFieldVal(cont, 'regimeBens'),
       profissao: getFieldVal(cont, 'profissao'),
       telefone: getFieldVal(cont, 'telefone'),

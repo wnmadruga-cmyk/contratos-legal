@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ lead.name or 'Lead' }} — Detalhe{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/leads/leads.css">
+
+<div class="d-flex align-items-center mb-3">
+  <a href="/leads?view=kanban" class="btn btn-sm btn-light me-2"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="mb-0 fw-bold flex-grow-1">{{ lead.name or 'Lead' }}</h4>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% include "leads/_card_modal.html" %}
+  </div>
+</div>
+
+<script>
+  window.LEADS_PRIORITIES = {{ priorities|tojson }};
+  window.LEADS_STATUSES   = {{ statuses|tojson }};
+  window.LEAD_FULLPAGE = true;
+</script>
+<script src="/static/leads/leads.js"></script>
+<script src="/static/leads/card-modal.js"></script>
+<script src="/static/leads/dynamic-form.js"></script>
+{% endblock %}

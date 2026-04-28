@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sistema de Contratos Societários
+ECM Registro
 Execute: python3 app.py
 Acesse:  http://localhost:8080
 """
@@ -11,19 +11,150 @@ import os
 from datetime import datetime
 
 from flask import (Flask, request, send_file, render_template,
-                   redirect, url_for, flash, jsonify)
+                   redirect, url_for, flash, jsonify, session)
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from db import init_db, salvar_ficha, atualizar_ficha, get_ficha, listar_fichas, excluir_ficha
 from db import listar_clausulas, salvar_clausula, excluir_clausula
 from db import listar_modelos, salvar_modelo
 from db import get_config, set_config
+from db import get_user_by_email, get_user_by_id, list_users, create_user, update_user, inativar_user
 from gerar_contrato import gerar_contrato
 from gerar_alteracao import gerar_alteracao
 from extrator_docx import extrair_dados_contrato
+import leads as leads_module
+from leads import db as leads_db
 
 app = Flask(__name__)
 app.secret_key = "contratos-societarios-2026"
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20 MB
+
+import json as _json
+@app.template_filter('fromjson')
+def fromjson_filter(s):
+    try:
+        return _json.loads(s or '{}')
+    except Exception:
+        return {}
+
+leads_module.register(app)
+
+
+@app.context_processor
+def inject_organ_types():
+    """Makes organ lead types available in all templates for sidebar rendering."""
+    try:
+        return {"organ_lead_types": leads_db.list_organ_lead_types()}
+    except Exception:
+        return {"organ_lead_types": []}
+
+
+@app.before_request
+def require_login():
+    public_paths = {"/login", "/logout"}
+    if request.path in public_paths or request.path.startswith("/static"):
+        return
+    # Public approval pages
+    if request.path.startswith("/leads/aprovacao/"):
+        return
+    # Public approval resolve API
+    if request.path.startswith("/api/leads/approval/"):
+        return
+    # Public client portal
+    if request.path.startswith("/processo/"):
+        return
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        senha = request.form.get("senha", "")
+        user = get_user_by_email(email)
+        if user and check_password_hash(user["password_hash"], senha):
+            session["user_id"]   = user["id"]
+            session["user_name"] = user["name"]
+            session["profile"]   = user["profile"]
+            return redirect(url_for("dashboard"))
+        flash("E-mail ou senha inválidos.", "danger")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/admin/usuarios", methods=["GET", "POST"])
+def admin_usuarios():
+    if session.get("profile") != "admin":
+        flash("Acesso negado.", "danger")
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        name       = request.form.get("name", "").strip()
+        email      = request.form.get("email", "").strip().lower()
+        senha      = request.form.get("password", "")
+        profile    = request.form.get("profile", "operacional")
+        can_review = 1 if request.form.get("can_review") else 0
+        if not name or not email or not senha:
+            flash("Todos os campos são obrigatórios.", "danger")
+        else:
+            try:
+                uid = create_user(name, email, generate_password_hash(senha, method="pbkdf2:sha256"), profile)
+                # Update can_review if needed
+                if can_review:
+                    from db import get_db as _get_db
+                    conn = _get_db()
+                    conn.execute("UPDATE users SET can_review=? WHERE email=?", (can_review, email))
+                    conn.commit()
+                    conn.close()
+                flash(f"Usuário '{name}' criado com sucesso.", "success")
+            except Exception as e:
+                flash(f"Erro ao criar usuário: {e}", "danger")
+        return redirect(url_for("admin_usuarios"))
+    return render_template("admin_usuarios.html", users=list_users())
+
+
+@app.route("/admin/usuarios/<uid>/editar", methods=["GET", "POST"])
+def admin_usuario_editar(uid):
+    if session.get("profile") != "admin":
+        flash("Acesso negado.", "danger")
+        return redirect(url_for("dashboard"))
+    user = get_user_by_id(uid)
+    if not user:
+        flash("Usuário não encontrado.", "danger")
+        return redirect(url_for("admin_usuarios"))
+    if request.method == "POST":
+        name       = request.form.get("name", "").strip()
+        email      = request.form.get("email", "").strip().lower()
+        profile    = request.form.get("profile", "operacional")
+        active     = int(request.form.get("active", 1))
+        can_review = 1 if request.form.get("can_review") else 0
+        update_user(uid, name, email, profile, active)
+        from db import get_db as _get_db
+        conn = _get_db()
+        conn.execute("UPDATE users SET can_review=? WHERE id=?", (can_review, uid))
+        nova_senha = request.form.get("senha", "").strip()
+        if nova_senha:
+            conn.execute("UPDATE users SET password_hash=? WHERE id=?",
+                         (generate_password_hash(nova_senha, method="pbkdf2:sha256"), uid))
+        conn.commit()
+        conn.close()
+        flash("Usuário atualizado.", "success")
+        return redirect(url_for("admin_usuarios"))
+    return render_template("admin_usuario_editar.html", user=user)
+
+
+@app.route("/admin/usuarios/<uid>/inativar", methods=["POST"])
+def admin_usuario_inativar(uid):
+    if session.get("profile") != "admin":
+        return jsonify({"erro": "Acesso negado"}), 403
+    inativar_user(uid)
+    flash("Usuário inativado.", "success")
+    return redirect(url_for("admin_usuarios"))
 
 # Carrega .env se existir (OPENAI_API_KEY etc.)
 _env_path = os.path.join(os.path.dirname(__file__), ".env")
@@ -96,6 +227,7 @@ def constituicao_salvar():
         "percentualPorSocio": percentuais
     }
 
+    lead_id_param = request.form.get("lead_id") or None
     ficha_id = request.form.get("ficha_id")
     if ficha_id:
         atualizar_ficha(int(ficha_id), subtipo, razao, dados)
@@ -103,6 +235,11 @@ def constituicao_salvar():
     else:
         ficha_id = salvar_ficha("constituicao", subtipo, razao, dados)
         flash(f"Ficha '{razao}' salva com sucesso!", "success")
+
+    if lead_id_param:
+        leads_db.link_ficha(lead_id_param, str(ficha_id))
+        leads_db.sync_sem_atividade_tag(lead_id_param, dados)
+        return redirect(f"/leads/{lead_id_param}")
 
     return redirect(url_for("dashboard"))
 
@@ -212,6 +349,7 @@ def alteracao_salvar():
         return redirect(url_for("alteracao_nova"))
 
     razao = dados.get("empresa_atual", {}).get("razaoSocial", "Sem Nome")
+    lead_id_param = request.form.get("lead_id") or None
     ficha_id = request.form.get("ficha_id")
     if ficha_id:
         atualizar_ficha(int(ficha_id), "alteracao", razao, dados)
@@ -219,6 +357,13 @@ def alteracao_salvar():
     else:
         ficha_id = salvar_ficha("alteracao", "alteracao", razao, dados)
         flash(f"Alteração '{razao}' salva!", "success")
+
+    if lead_id_param:
+        leads_db.link_ficha(lead_id_param, str(ficha_id))
+        # For alterations: atividades may be under empresa_atual.atividades
+        _dados_sync = {"empresa": dados.get("empresa_atual", dados.get("empresa", {}))}
+        leads_db.sync_sem_atividade_tag(lead_id_param, _dados_sync)
+        return redirect(f"/leads/{lead_id_param}")
 
     return redirect(url_for("dashboard"))
 
@@ -556,6 +701,10 @@ def sugerir_objeto_cnae():
             f"1. Redija um OBJETO SOCIAL formal para o contrato social de uma sociedade limitada, "
             f"nos padrões aceitos pela Junta Comercial. O texto deve ser formal, em caixa alta, "
             f"completo e juridicamente adequado para registro. "
+            f"IMPORTANTE: NUNCA utilize termos vagos como 'correlatas', 'afins', 'similares', "
+            f"'outras atividades', 'demais atividades', 'e outras' — o objeto social deve ser "
+            f"completamente específico e detalhado, descrevendo cada atividade de forma individualizada, "
+            f"sob pena de indeferimento pela Junta Comercial. "
             f"Retorne apenas o texto do objeto social, sem prefixo.\n\n"
             f"2. Sugira de 1 a 6 códigos CNAE (subclasses) mais adequados para essas atividades, "
             f"indicando qual deve ser o principal.\n\n"
@@ -713,6 +862,40 @@ def fcn_config():
 
     perguntas = get_config("fcn_perguntas", _FCN_PERGUNTAS_PADRAO)
     return render_template("fcn_config.html", perguntas=perguntas)
+
+
+# ---------------------------------------------------------------------------
+# Portal do Cliente (público)
+# ---------------------------------------------------------------------------
+
+@app.route("/processo/<token>")
+def portal_cliente(token):
+    """Portal público de acompanhamento — acesso direto pelo link, sem senha."""
+    from datetime import date as _date
+    lead = leads_db.get_lead_by_client_token(token)
+    if not lead:
+        return render_template("leads/portal_404.html"), 404
+    portal_data = leads_db.get_client_portal_data(lead["id"])
+
+    # Detect the lead's UF to find the relevant state manual
+    state_manual = None
+    if lead.get("op_link_assinatura_junta"):
+        lead_uf = None
+        if lead.get("ficha_id"):
+            try:
+                ficha = get_ficha(int(lead["ficha_id"]))
+                if ficha:
+                    dados = ficha.get("dados") or {}
+                    empresa = dados.get("empresa") or dados.get("empresa_atual") or {}
+                    lead_uf = (empresa.get("estado") or empresa.get("estadoSede") or "").strip().upper()
+            except Exception:
+                pass
+        if lead_uf:
+            state_manual = leads_db.get_state_manual(lead_uf)
+
+    return render_template("leads/portal_cliente.html", token=token,
+                           portal=portal_data, today=_date.today(),
+                           state_manual=state_manual)
 
 
 if __name__ == "__main__":

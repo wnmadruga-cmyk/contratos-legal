@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+{% block title %}Admin — Tipos & Etapas{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/leads/leads.css">
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h4 class="mb-0 fw-bold"><i class="bi bi-gear"></i> Configurações do CRM</h4>
+    <small class="text-muted">Configure os funis do CRM</small>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newTypeModal">
+    <i class="bi bi-plus-circle"></i> Novo serviço
+  </button>
+</div>
+
+{% include "leads/admin/_admin_tabs.html" %}
+
+<div class="row g-3">
+  <!-- Lista de tipos -->
+  <div class="col-md-3">
+    <div class="card">
+      <div class="list-group list-group-flush">
+        {% for t in types %}
+        <a href="?id={{ t.id }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
+                  {% if selected and selected.id == t.id %}active{% endif %}">
+          <span><span class="lead-color-dot" style="background:{{ t.color }}"></span> {{ t.name }}</span>
+          {% if not t.active %}<span class="badge bg-secondary">inativo</span>{% endif %}
+        </a>
+        {% else %}
+        <div class="text-muted text-center py-4 small">Nenhum serviço cadastrado.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Detalhe -->
+  <div class="col-md-9">
+    {% if selected %}
+    <div class="card mb-3">
+      <div class="card-body">
+        <form method="post" action="/admin/leads/tipos/salvar" class="row g-2 align-items-end">
+          <input type="hidden" name="id" value="{{ selected.id }}">
+          <div class="col-md-6">
+            <label class="form-label small text-muted">Nome do serviço</label>
+            <input type="text" class="form-control" name="name" value="{{ selected.name }}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small text-muted">Cor</label>
+            <input type="color" class="form-control form-control-color w-100" name="color" value="{{ selected.color }}">
+          </div>
+          <div class="col-md-2">
+            <div class="form-check mt-4">
+              <input class="form-check-input" type="checkbox" id="actCheck" name="active" {% if selected.active
+                %}checked{% endif %}>
+              <label class="form-check-label" for="actCheck">Ativo</label>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-primary w-100"><i class="bi bi-save"></i> Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% if workflow %}
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-collection"></i> Macrofases</span>
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#newMacroModal">
+          + macrofase
+        </button>
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for mp in macrophases %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ mp.name }}</strong>
+            {% if mp.sla_days %}<small class="text-muted">— {{ mp.sla_days }}d total</small>{% endif %}
+          </div>
+          <div class="d-flex align-items-center">
+            <button class="btn btn-sm btn-link text-primary me-2"
+              onclick="editMacro('{{ mp.id }}', '{{ mp.name }}', '{{ mp.sla_days or '' }}')">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form method="post" action="/admin/leads/macrofases/{{ mp.id }}/excluir" class="m-0">
+              <input type="hidden" name="type_id" value="{{ selected.id }}">
+              <button class="btn btn-sm btn-link text-danger"
+                onclick="return confirm('Excluir macrofase {{ mp.name }}?')"><i class="bi bi-trash"></i></button>
+            </form>
+          </div>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted text-center small">Nenhuma macrofase ainda.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-list-stars"></i> Etapas</span>
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#newStageModal">
+          + etapa
+        </button>
+      </div>
+      <ul class="list-group list-group-flush" id="stagesSortable">
+        {% for st in stages %}
+        <li class="list-group-item p-0" data-stage-id="{{ st.id }}">
+          <div class="d-flex justify-content-between align-items-center px-3 py-2">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-grip-vertical text-muted" style="cursor:grab"></i>
+              <strong>{{ st.name }}</strong>
+              {% set mp_match = macrophases|selectattr('id','equalto',st.macrophase_id)|list %}
+              {% if mp_match %}<span class="badge bg-light text-dark">{{ mp_match[0].name }}</span>{% endif %}
+              {% if st.sla_days %}<small class="text-muted">SLA {{ st.sla_days }}d</small>{% endif %}
+            </div>
+            <div class="d-flex align-items-center gap-1">
+              {% set linked_tpl = checklist_templates | selectattr('id','equalto', st.checklist_template_id) | list %}
+              <button class="btn btn-sm btn-outline-success" title="Checklist da etapa"
+                onclick="toggleChecklist('{{ st.id }}')">
+                <i class="bi bi-check2-square"></i>
+                {% if linked_tpl %}
+                <span class="badge bg-success ms-1" title="Modelo: {{ linked_tpl[0].code }}">{{ linked_tpl[0].code }}</span>
+                {% else %}
+                {% set tpl_count = checklists_by_stage.get(st.id, [])|length %}
+                {% if tpl_count %}<span class="badge bg-success ms-1">{{ tpl_count }}</span>{% endif %}
+                {% endif %}
+              </button>
+              <button class="btn btn-sm btn-link text-primary p-1"
+                onclick="editStage('{{ st.id }}', '{{ st.name }}', '{{ st.sla_days or '' }}', '{{ st.macrophase_id or '' }}')">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <form method="post" action="/admin/leads/etapas/{{ st.id }}/excluir" class="m-0">
+                <input type="hidden" name="type_id" value="{{ selected.id }}">
+                <button class="btn btn-sm btn-link text-danger p-1"
+                  onclick="return confirm('Excluir etapa {{ st.name }}?')"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+          </div>
+          <!-- Checklist template panel (hidden by default) -->
+          <div id="chk-panel-{{ st.id }}" class="d-none border-top px-3 py-2 bg-light">
+            <div class="small text-muted fw-bold mb-2">Checklist automático desta etapa</div>
+            <!-- Template linker -->
+            <form method="post" action="/admin/leads/etapas/{{ st.id }}/link-checklist"
+              class="d-flex gap-2 align-items-center mb-3 p-2 rounded border bg-white">
+              <i class="bi bi-link-45deg text-primary"></i>
+              <div class="flex-grow-1">
+                <label class="form-label small fw-semibold mb-0">Modelo de checklist vinculado</label>
+                <div class="text-muted" style="font-size:10px;">Ao entrar nesta etapa, todos os itens do modelo são adicionados automaticamente ao processo.</div>
+              </div>
+              <input type="hidden" name="type_id" value="{{ selected.id }}">
+              <select name="checklist_template_id" class="form-select form-select-sm" style="max-width:220px;">
+                <option value="">(nenhum)</option>
+                {% for tpl in checklist_templates %}
+                <option value="{{ tpl.id }}" {% if st.checklist_template_id == tpl.id %}selected{% endif %}>
+                  [{{ tpl.code }}] {{ tpl.name }}
+                </option>
+                {% endfor %}
+              </select>
+              <button class="btn btn-sm btn-primary">Vincular</button>
+            </form>
+            <ul class="list-unstyled mb-2" id="chk-list-{{ st.id }}">
+              {% for tpl in checklists_by_stage.get(st.id, []) %}
+              <li class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-check2-square text-success"></i>
+                <span class="small flex-grow-1">{{ tpl.label }}</span>
+                {% if tpl.required %}<span class="badge bg-warning text-dark" style="font-size:9px;">obrigatório</span>{% endif %}
+                <form method="post" action="/admin/leads/stage-checklist/{{ tpl.id }}/excluir" class="m-0">
+                  <input type="hidden" name="stage_id" value="{{ st.id }}">
+                  <input type="hidden" name="type_id" value="{{ selected.id }}">
+                  <button class="btn btn-xs btn-link text-danger p-0" style="font-size:12px;"><i class="bi bi-x"></i></button>
+                </form>
+              </li>
+              {% else %}
+              <li class="small text-muted" id="chk-empty-{{ st.id }}">Nenhum item cadastrado.</li>
+              {% endfor %}
+            </ul>
+            <form method="post" action="/admin/leads/stage-checklist/add" class="d-flex gap-2 align-items-center">
+              <input type="hidden" name="stage_id" value="{{ st.id }}">
+              <input type="hidden" name="type_id" value="{{ selected.id }}">
+              <input type="text" name="label" class="form-control form-control-sm" placeholder="Novo item de checklist…" required style="max-width:260px;">
+              <div class="form-check mb-0 ms-1">
+                <input class="form-check-input" type="checkbox" name="required" value="1" id="req-{{ st.id }}">
+                <label class="form-check-label small" for="req-{{ st.id }}">Obrigatório</label>
+              </div>
+              <button class="btn btn-sm btn-success">+ Adicionar</button>
+            </form>
+          </div>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted text-center small">Nenhuma etapa ainda.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- Modal nova macrofase -->
+    <div class="modal fade" id="newMacroModal" tabindex="-1">
+      <div class="modal-dialog">
+        <form class="modal-content" method="post" action="/admin/leads/macrofases/salvar">
+          <input type="hidden" name="id" id="macroId">
+          <div class="modal-header">
+            <h5 class="modal-title" id="macroModalTitle">Nova macrofase</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="workflow_id" value="{{ workflow.id }}">
+            <input type="hidden" name="type_id" value="{{ selected.id }}">
+            <div class="mb-2">
+              <label class="form-label">Nome</label>
+              <input type="text" class="form-control" name="name" id="macroName" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">SLA (dias úteis)</label>
+              <input type="number" class="form-control" name="sla_days" id="macroSla" min="0">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-primary">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal nova etapa -->
+    <div class="modal fade" id="newStageModal" tabindex="-1">
+      <div class="modal-dialog">
+        <form class="modal-content" method="post" action="/admin/leads/etapas/salvar">
+          <input type="hidden" name="id" id="stageId">
+          <div class="modal-header">
+            <h5 class="modal-title" id="stageModalTitle">Nova etapa</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="workflow_id" value="{{ workflow.id }}">
+            <input type="hidden" name="type_id" value="{{ selected.id }}">
+            <div class="mb-2">
+              <label class="form-label">Nome</label>
+              <input type="text" class="form-control" name="name" id="stageName" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Macrofase</label>
+              <select class="form-select" name="macrophase_id" id="stageMacro">
+                <option value="">(nenhuma)</option>
+                {% for mp in macrophases %}
+                <option value="{{ mp.id }}">{{ mp.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">SLA da etapa (dias úteis)</label>
+              <input type="number" class="form-control" name="sla_days" id="stageSla" min="0">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-primary">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <script>
+      let macroModal, stageModal;
+      document.addEventListener('DOMContentLoaded', () => {
+        macroModal = new bootstrap.Modal(document.getElementById('newMacroModal'));
+        stageModal = new bootstrap.Modal(document.getElementById('newStageModal'));
+
+        // Limpar modais
+        document.getElementById('newMacroModal').addEventListener('hidden.bs.modal', function () {
+          document.getElementById('macroModalTitle').innerText = 'Nova macrofase';
+          document.getElementById('macroId').value = '';
+          document.getElementById('macroName').value = '';
+          document.getElementById('macroSla').value = '';
+        });
+        document.getElementById('newStageModal').addEventListener('hidden.bs.modal', function () {
+          document.getElementById('stageModalTitle').innerText = 'Nova etapa';
+          document.getElementById('stageId').value = '';
+          document.getElementById('stageName').value = '';
+          document.getElementById('stageSla').value = '';
+          document.getElementById('stageMacro').value = '';
+        });
+      });
+
+      function editMacro(id, name, sla) {
+        document.getElementById('macroModalTitle').innerText = 'Editar Macrofase';
+        document.getElementById('macroId').value = id;
+        document.getElementById('macroName').value = name;
+        document.getElementById('macroSla').value = sla;
+        macroModal.show();
+      }
+
+      function editStage(id, name, sla, macro_id) {
+        document.getElementById('stageModalTitle').innerText = 'Editar Etapa';
+        document.getElementById('stageId').value = id;
+        document.getElementById('stageName').value = name;
+        document.getElementById('stageSla').value = sla;
+        document.getElementById('stageMacro').value = macro_id;
+        stageModal.show();
+      }
+
+      function toggleChecklist(stageId) {
+        const panel = document.getElementById('chk-panel-' + stageId);
+        if (!panel) return;
+        const isHidden = panel.classList.contains('d-none');
+        // Close all other panels first
+        document.querySelectorAll('[id^="chk-panel-"]').forEach(p => p.classList.add('d-none'));
+        if (isHidden) {
+          panel.classList.remove('d-none');
+          panel.querySelector('input[name="label"]')?.focus();
+        }
+      }
+
+      // Auto-open panel if URL hash matches (after add/delete redirects)
+      document.addEventListener('DOMContentLoaded', () => {
+        const hash = window.location.hash;
+        if (hash && hash.startsWith('#chk-panel-')) {
+          const panel = document.querySelector(hash);
+          if (panel) {
+            panel.classList.remove('d-none');
+            panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      });
+    </script>
+
+    <form method="post" action="/admin/leads/tipos/{{ selected.id }}/excluir" class="mt-3 text-end"
+      onsubmit="return confirm('Excluir o serviço \'{{ selected.name }}\' e todos os leads associados?')">
+      <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Excluir serviço</button>
+    </form>
+    {% else %}
+    <div class="card">
+      <div class="card-body text-center text-muted py-5">
+        Selecione um serviço à esquerda ou crie um novo.
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal novo serviço -->
+<div class="modal fade" id="newTypeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" method="post" action="/admin/leads/tipos/salvar">
+      <div class="modal-header">
+        <h5 class="modal-title">Novo serviço</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2"><label class="form-label">Nome</label>
+          <input type="text" name="name" class="form-control" required>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6"><label class="form-label">Cor</label>
+            <input type="color" class="form-control form-control-color w-100" name="color" value="#2456a4">
+          </div>
+          <div class="col-6 d-flex align-items-end">
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="actNew" name="active" checked>
+              <label class="form-check-label" for="actNew">Ativo</label>
+            </div>
+          </div>
+        </div>
+        <div class="mb-2 border-top pt-3">
+          <label class="form-label text-muted small fw-bold">Copiar layout de etapas de:</label>
+          <select class="form-select" name="copy_from_type_id">
+            <option value="">Criar novo em branco (zerado)</option>
+            {% for t in types %}
+            <option value="{{ t.id }}">{{ t.name }}</option>
+            {% endfor %}
+          </select>
+          <small class="text-muted d-block mt-1" style="font-size: 11px;">Opcional: importará todas as macrofases e
+            prazos de outro serviço já existente.</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary">Criar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+  // Reordenação de etapas via drag-and-drop
+  const list = document.getElementById('stagesSortable');
+  if (list && list.children.length > 1) {
+    Sortable.create(list, {
+      handle: '.bi-grip-vertical',
+      animation: 150,
+      onEnd: () => {
+        const ids = [...list.querySelectorAll('[data-stage-id]')].map(el => el.dataset.stageId);
+        fetch('/admin/leads/etapas/reordenar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ordered_ids: ids })
+        });
+      }
+    });
+  }
+</script>
+{% endblock %}

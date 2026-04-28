@@ -1,0 +1,44 @@
+{# Lead card no Kanban. Recebe `l` no contexto (o lead). #}
+<div class="kanban-card" data-lead-id="{{ l.id }}" data-priority="{{ l.priority }}">
+  {% set prog = l._progress | default(0) %}
+  <div style="height:3px;border-radius:2px 2px 0 0;background:#e2e8f0;margin:-12px -12px 10px -12px;overflow:hidden;">
+    <div style="height:100%;width:{{ prog }}%;background:{% if prog >= 100 %}#10b981{% elif prog >= 60 %}#3b82f6{% else %}#94a3b8{% endif %};transition:width .3s;"></div>
+  </div>
+  <div class="kanban-card-head">
+    <span class="lead-prio-dot" data-prio="{{ l.priority }}"></span>
+    <span class="kanban-card-title">{{ l.name or '—' }}</span>
+  </div>
+  {% if l.tags %}
+  <div class="d-flex gap-1 flex-wrap mt-2">
+    {% for t in l.tags %}
+    <span class="lead-tag" style="background:{{ t.color }}20;color:{{ t.color }};border:1px solid {{ t.color }}40">{{ t.name }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if l.status not in ('Concluído','Cancelado','Inativo Pedido Cliente') %}
+  <div class="mt-2 d-flex align-items-center gap-1 flex-wrap">
+    {% if l.due_date_junta %}
+    <span class="lead-deadline-cnpj" data-due="{{ l.due_date_junta }}"
+      style="font-size:.7rem;border-radius:10px;padding:.15rem .5rem;background:#dbeafe;color:#1d4ed8;display:inline-flex;align-items:center;gap:3px;"
+      title="CNPJ · {{ l.due_date_junta }}">
+      <i class="bi bi-building" style="font-size:.65rem;"></i>CNPJ <span class="cnpj-days"></span>
+    </span>
+    {% endif %}
+    {% if l.due_date_nf %}
+    <span class="lead-deadline-nf" data-due="{{ l.due_date_nf }}"
+      style="font-size:.7rem;border-radius:10px;padding:.15rem .5rem;background:#d1fae5;color:#065f46;display:inline-flex;align-items:center;gap:3px;"
+      title="Nota Fiscal · {{ l.due_date_nf }}">
+      <i class="bi bi-receipt" style="font-size:.65rem;"></i>NF <span class="nf-days"></span>
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
+  <div class="d-flex justify-content-between align-items-center mt-1">
+    <small class="lead-deadline" data-entered="{{ l.stage_entered_at }}" data-sla="{{ l.stage_sla or '' }}"></small>
+    {% if l.responsible_name %}
+    <span class="lead-avatar" title="{{ l.responsible_name }}">
+      {{ l.responsible_name.split()[0][0]|upper }}{% if l.responsible_name.split()|length > 1 %}{{ l.responsible_name.split()[-1][0]|upper }}{% endif %}
+    </span>
+    {% endif %}
+  </div>
+</div>

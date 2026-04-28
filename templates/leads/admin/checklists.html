@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% block title %}Admin — Modelos de Checklist{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/leads/leads.css">
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h4 class="mb-0 fw-bold"><i class="bi bi-check2-square"></i> Modelos de Checklist</h4>
+    <small class="text-muted">Crie modelos reutilizáveis e vincule-os a etapas. A etapa não avança enquanto os itens obrigatórios não forem concluídos.</small>
+  </div>
+  <button class="btn btn-primary" onclick="openNewModal()">
+    <i class="bi bi-plus-circle"></i> Novo Modelo
+  </button>
+</div>
+
+{% include "leads/admin/_admin_tabs.html" %}
+
+{% if not templates %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-check2-square fs-2 d-block mb-2 opacity-25"></i>
+    Nenhum modelo ainda. Crie o primeiro clicando em <strong>Novo Modelo</strong>.
+  </div>
+</div>
+{% endif %}
+
+{% for tpl in templates %}
+{# IMPORTANT: use tpl['items'] not tpl.items — Jinja2 would return the dict method otherwise #}
+{% set tpl_items = tpl['items'] %}
+<div class="card mb-3" id="{{ tpl.id }}">
+  <div class="card-header d-flex align-items-center justify-content-between py-2">
+    <div class="d-flex align-items-center gap-3">
+      <span class="badge bg-dark font-monospace fs-6 px-3 py-1">{{ tpl.code }}</span>
+      <div>
+        <div class="fw-bold d-flex align-items-center gap-2">
+          {{ tpl.name }}
+          {% if tpl.is_default %}
+          <span class="badge bg-success" style="font-size:10px;">Padrão global</span>
+          {% endif %}
+        </div>
+        {% if tpl.description %}<div class="text-muted small">{{ tpl.description }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      {% if tpl.stages_using %}
+      <span class="badge bg-primary-subtle text-primary border" title="Etapas vinculadas" style="font-size:11px;">
+        <i class="bi bi-diagram-3 me-1"></i>{{ tpl.stages_using|length }} etapa(s)
+      </span>
+      {% endif %}
+      <span class="badge bg-secondary-subtle text-secondary border" style="font-size:11px;">
+        {{ tpl_items|length }} item(s)
+      </span>
+      <button class="btn btn-sm btn-outline-secondary"
+        onclick="openEditModal('{{ tpl.id }}', '{{ tpl.name|e }}', '{{ tpl.code|e }}', '{{ tpl.description|e }}', {{ 1 if tpl.is_default else 0 }})">
+        <i class="bi bi-pencil"></i>
+      </button>
+      <form method="post" action="/admin/leads/checklists/{{ tpl.id }}/excluir" class="m-0"
+        onsubmit="return confirm('Excluir modelo {{ tpl.name|e }}? As etapas vinculadas perderão o vínculo.')">
+        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card-body p-0">
+    <!-- Items list -->
+    <ul class="list-group list-group-flush">
+      {% for item in tpl_items %}
+      <li class="list-group-item d-flex align-items-center gap-2 py-2 px-3">
+        <i class="bi bi-check2-square text-primary" style="font-size:13px;"></i>
+        <span class="flex-grow-1 small">{{ item.label }}</span>
+        {% if item.required %}
+        <span class="badge bg-danger text-white" style="font-size:9px;">Obrigatório</span>
+        {% endif %}
+        <form method="post" action="/admin/leads/checklists/items/{{ item.id }}/excluir" class="m-0">
+          <input type="hidden" name="tpl_id" value="{{ tpl.id }}">
+          <button class="btn btn-xs btn-link text-danger p-0" style="font-size:12px;"><i class="bi bi-x-circle"></i></button>
+        </form>
+      </li>
+      {% else %}
+      <li class="list-group-item text-muted small text-center py-2 bg-light">
+        <i class="bi bi-info-circle me-1"></i>Nenhum item. Adicione abaixo.
+      </li>
+      {% endfor %}
+    </ul>
+
+    <!-- Add item form -->
+    <form method="post" action="/admin/leads/checklists/{{ tpl.id }}/items/add"
+      class="d-flex gap-2 align-items-center px-3 py-2 border-top bg-light">
+      <input type="text" name="label" class="form-control form-control-sm"
+        placeholder="Novo item do checklist…" required style="max-width:380px;">
+      <div class="form-check mb-0 d-flex align-items-center gap-1">
+        <input class="form-check-input mt-0" type="checkbox" name="required" value="1" id="req-{{ tpl.id }}">
+        <label class="form-check-label small text-danger fw-semibold" for="req-{{ tpl.id }}">Obrigatório</label>
+      </div>
+      <button class="btn btn-sm btn-success"><i class="bi bi-plus"></i> Adicionar</button>
+    </form>
+
+    <!-- Stages using this template -->
+    {% if tpl.stages_using %}
+    <div class="px-3 py-2 border-top bg-white">
+      <div class="text-muted small fw-bold mb-1">Etapas que bloqueiam passagem com este modelo:</div>
+      <div class="d-flex flex-wrap gap-1">
+        {% for st in tpl.stages_using %}
+        <span class="badge bg-primary-subtle text-primary border">
+          <i class="bi bi-lock me-1" style="font-size:9px;"></i>{{ st.name }}
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+<!-- ======================== MODAL: Novo / Editar ======================== -->
+<div class="modal fade" id="tplModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <form class="modal-content" method="post" id="tplForm" action="/admin/leads/checklists/salvar">
+      <input type="hidden" name="id" id="tplId">
+      <input type="hidden" name="items_json" id="tplItemsJson" value="[]">
+      <div class="modal-header">
+        <h5 class="modal-title" id="tplModalTitle">
+          <i class="bi bi-check2-square me-2"></i>Novo Modelo de Checklist
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Template metadata -->
+        <div class="row g-3 mb-4">
+          <div class="col-md-8">
+            <label class="form-label small fw-semibold">Nome do modelo <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="name" id="tplName" required
+              placeholder="Ex: Checklist Cadastro de Sistemas">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Código <span class="text-danger">*</span></label>
+            <input type="text" class="form-control font-monospace text-uppercase" name="code" id="tplCode" required
+              placeholder="Ex: CAD-SIS" maxlength="20">
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-semibold">Descrição</label>
+            <input type="text" class="form-control" name="description" id="tplDesc"
+              placeholder="Opcional — breve descrição">
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="is_default" value="1" id="tplDefault">
+              <label class="form-check-label" for="tplDefault">
+                <strong>Padrão global</strong>
+                <span class="text-muted small d-block">Aplicado a todos os novos processos criados.</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Items section -->
+        <div class="border-top pt-3">
+          <div class="fw-semibold small text-uppercase text-muted mb-2">
+            <i class="bi bi-list-check me-1"></i>Itens do checklist
+            <span class="text-muted fw-normal ms-1">(itens marcados como <span class="text-danger">Obrigatório</span> bloqueiam avanço de etapa)</span>
+          </div>
+          <ul class="list-group list-group-flush mb-2 rounded border" id="modalItemList">
+            <li class="list-group-item text-muted small text-center py-2 bg-light" id="modalItemEmpty">
+              Nenhum item ainda. Adicione abaixo.
+            </li>
+          </ul>
+          <div class="d-flex gap-2 align-items-center">
+            <input type="text" class="form-control form-control-sm" id="newItemLabel"
+              placeholder="Descrição do item…" style="flex:1;">
+            <div class="form-check mb-0 d-flex align-items-center gap-1 flex-shrink-0">
+              <input class="form-check-input mt-0" type="checkbox" id="newItemRequired">
+              <label class="form-check-label small text-danger fw-semibold">Obrigatório</label>
+            </div>
+            <button type="button" class="btn btn-sm btn-success flex-shrink-0" id="addModalItem">
+              <i class="bi bi-plus"></i> Adicionar
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" id="tplSaveBtn">
+          <i class="bi bi-check2 me-1"></i>Salvar modelo
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  let tplModal;
+  let modalItems = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    tplModal = new bootstrap.Modal(document.getElementById('tplModal'));
+
+    document.getElementById('tplModal').addEventListener('hidden.bs.modal', resetModal);
+
+    // Add item button
+    document.getElementById('addModalItem').addEventListener('click', addItemToModal);
+    document.getElementById('newItemLabel').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addItemToModal(); }
+    });
+
+    // Before submit: serialize items to JSON
+    document.getElementById('tplForm').addEventListener('submit', () => {
+      document.getElementById('tplItemsJson').value = JSON.stringify(modalItems);
+    });
+
+    // Auto-scroll to hash
+    const hash = window.location.hash;
+    if (hash) {
+      const el = document.querySelector(hash);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
+  function resetModal() {
+    document.getElementById('tplId').value = '';
+    document.getElementById('tplName').value = '';
+    document.getElementById('tplCode').value = '';
+    document.getElementById('tplDesc').value = '';
+    document.getElementById('tplDefault').checked = false;
+    document.getElementById('tplModalTitle').innerHTML = '<i class="bi bi-check2-square me-2"></i>Novo Modelo de Checklist';
+    modalItems = [];
+    renderModalItems();
+  }
+
+  function addItemToModal() {
+    const label = document.getElementById('newItemLabel').value.trim();
+    const required = document.getElementById('newItemRequired').checked;
+    if (!label) return;
+    modalItems.push({ label, required });
+    document.getElementById('newItemLabel').value = '';
+    document.getElementById('newItemRequired').checked = false;
+    renderModalItems();
+    document.getElementById('newItemLabel').focus();
+  }
+
+  function removeModalItem(idx) {
+    modalItems.splice(idx, 1);
+    renderModalItems();
+  }
+
+  function renderModalItems() {
+    const ul = document.getElementById('modalItemList');
+    const empty = document.getElementById('modalItemEmpty');
+    // Clear existing items (keep the empty placeholder)
+    ul.querySelectorAll('.modal-item-row').forEach(el => el.remove());
+    if (modalItems.length === 0) {
+      empty.style.display = '';
+      return;
+    }
+    empty.style.display = 'none';
+    modalItems.forEach((item, idx) => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item modal-item-row d-flex align-items-center gap-2 py-2 px-3';
+      li.innerHTML = `
+        <i class="bi bi-check2-square text-primary" style="font-size:13px;"></i>
+        <span class="flex-grow-1 small">${escHtml(item.label)}</span>
+        ${item.required ? '<span class="badge bg-danger text-white" style="font-size:9px;">Obrigatório</span>' : ''}
+        <button type="button" class="btn btn-xs btn-link text-danger p-0" style="font-size:12px;" onclick="removeModalItem(${idx})">
+          <i class="bi bi-x-circle"></i>
+        </button>`;
+      ul.appendChild(li);
+    });
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+  }
+
+  function openNewModal() {
+    resetModal();
+    tplModal.show();
+  }
+
+  function openEditModal(id, name, code, desc, isDefault) {
+    resetModal();
+    document.getElementById('tplId').value = id;
+    document.getElementById('tplName').value = name;
+    document.getElementById('tplCode').value = code;
+    document.getElementById('tplDesc').value = desc;
+    document.getElementById('tplDefault').checked = !!isDefault;
+    document.getElementById('tplModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Editar Modelo';
+    // Note: items cannot be edited via modal — use the inline form below each card
+    tplModal.show();
+  }
+</script>
+{% endblock %}

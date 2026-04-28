@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Editar Usuário — ECM Registro{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <a href="/admin/usuarios" class="btn btn-sm btn-outline-secondary me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h4 class="mb-0 fw-bold">Editar Usuário</h4>
+    <small class="text-muted">{{ user.name }}</small>
+  </div>
+</div>
+
+<div class="card" style="max-width:520px;">
+  <div class="card-body">
+    <form method="POST" action="/admin/usuarios/{{ user.id }}/editar">
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Nome completo <span class="text-danger">*</span></label>
+        <input type="text" name="name" class="form-control" value="{{ user.name | e }}" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">E-mail <span class="text-danger">*</span></label>
+        <input type="email" name="email" class="form-control" value="{{ user.email | e }}" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Nova senha <span class="text-muted fw-normal">(deixe em branco para manter)</span></label>
+        <input type="password" name="senha" class="form-control" minlength="6" placeholder="••••••••">
+      </div>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Perfil</label>
+        <select name="profile" class="form-select">
+          <option value="operacional" {% if user.profile == 'operacional' %}selected{% endif %}>Operacional</option>
+          <option value="gerente" {% if user.profile == 'gerente' %}selected{% endif %}>Gerente</option>
+          <option value="admin" {% if user.profile == 'admin' %}selected{% endif %}>Administrador</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="can_review" value="1" id="canReviewEdit"
+            {% if user.can_review %}checked{% endif %}>
+          <label class="form-check-label small" for="canReviewEdit">
+            Pode revisar conferência interna
+          </label>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label small fw-semibold">Status</label>
+        <select name="active" class="form-select">
+          <option value="1" {% if user.active %}selected{% endif %}>Ativo</option>
+          <option value="0" {% if not user.active %}selected{% endif %}>Inativo</option>
+        </select>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i> Salvar Alterações
+        </button>
+        <a href="/admin/usuarios" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

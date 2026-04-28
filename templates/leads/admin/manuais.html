@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Manuais de Assinatura por Estado{% endblock %}
+{% block content %}
+{% include "leads/admin/_admin_tabs.html" %}
+
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-book me-2"></i>Manuais de Assinatura por Estado (UF)</span>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Cadastre um manual de assinatura para cada estado. Quando o link de assinatura da Junta Comercial
+          for preenchido em um processo, o manual do estado correspondente à sede da empresa ficará disponível
+          para download no painel do cliente.
+        </p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for cat, msg in messages %}
+          <div class="alert alert-{{ cat }} alert-dismissible">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+          {% endfor %}
+        {% endwith %}
+
+        {% if manuals %}
+        <table class="table table-sm table-hover mb-4">
+          <thead class="table-light">
+            <tr>
+              <th style="width:80px;">UF</th>
+              <th>Nome / Descrição</th>
+              <th>Arquivo</th>
+              <th style="width:80px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in manuals %}
+            <tr>
+              <td><span class="badge bg-primary-subtle text-primary border fw-bold">{{ m.state_code }}</span></td>
+              <td>{{ m.name }}</td>
+              <td>
+                <a href="/api/leads/manuais-estado/{{ m.state_code }}" target="_blank"
+                   class="text-decoration-none small">
+                  <i class="bi bi-file-earmark-pdf me-1"></i>{{ m.filename }}
+                  {% if m.size_bytes %}<span class="text-muted">({{ (m.size_bytes/1024)|round(1) }} KB)</span>{% endif %}
+                </a>
+              </td>
+              <td>
+                <form action="/admin/leads/manuais/{{ m.state_code }}/excluir" method="post"
+                      onsubmit="return confirm('Remover manual de {{ m.state_code }}?')">
+                  <button class="btn btn-sm btn-outline-danger px-2"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-4 border rounded-3 bg-light mb-4">
+          <i class="bi bi-book d-block mb-2" style="font-size:2rem;"></i>
+          Nenhum manual cadastrado ainda.
+        </div>
+        {% endif %}
+
+        <!-- Upload form -->
+        <div class="card border-0 bg-light">
+          <div class="card-body">
+            <h6 class="fw-bold mb-3"><i class="bi bi-cloud-upload me-2"></i>Adicionar / Substituir Manual</h6>
+            <form action="/admin/leads/manuais/upload" method="post" enctype="multipart/form-data">
+              <div class="row g-3">
+                <div class="col-md-2">
+                  <label class="form-label small">UF <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control form-control-sm text-uppercase" name="state_code"
+                         placeholder="PR" maxlength="2" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Nome / Descrição</label>
+                  <input type="text" class="form-control form-control-sm" name="name"
+                         placeholder="Manual de Assinatura — Paraná">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Arquivo (PDF, DOCX) <span class="text-danger">*</span></label>
+                  <input type="file" class="form-control form-control-sm" name="file"
+                         accept=".pdf,.doc,.docx" required>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                  <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-upload me-1"></i>Enviar
+                  </button>
+                </div>
+              </div>
+              <div class="text-muted mt-2" style="font-size:11px;">
+                Se já existir um manual para a UF informada, ele será substituído.
+              </div>
+            </form>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card border-0 bg-light">
+      <div class="card-body">
+        <h6 class="fw-bold mb-2"><i class="bi bi-info-circle me-2 text-primary"></i>Como funciona</h6>
+        <ul class="small text-muted ps-3 mb-0">
+          <li class="mb-2">Cadastre um manual por UF (estado da sede da empresa).</li>
+          <li class="mb-2">Quando o campo <strong>Link de Assinatura — Junta Comercial</strong> for preenchido no card do processo, o manual do estado correspondente aparecerá automaticamente no painel do cliente.</li>
+          <li class="mb-2">O sistema identifica o estado pela <strong>sede</strong> informada no formulário de constituição ou alteração.</li>
+          <li>Se já houver um manual para a UF, o upload substitui o anterior.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

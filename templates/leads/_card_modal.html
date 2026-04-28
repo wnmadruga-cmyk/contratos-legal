@@ -1,0 +1,943 @@
+{# Conteúdo interno do card modal — injetado via fetch /api/leads/<id>/modal #}
+{# op_flags: all flag buttons shown in Operacional tab #}
+{% set op_flags = [
+  ('op_baixo_risco',  'Baixo Risco'),
+  ('op_alvara',       'Alvará'),
+  ('op_bombeiro',     'Bombeiro'),
+  ('op_vigilancia',   'Vigilância Sanitária'),
+  ('op_conselho',     'Conselho de Classe'),
+] %}
+{# organ_types: only the true organs that get a detail panel in the Órgãos tab (not baixo_risco) #}
+{% set organ_types = [
+  ('op_alvara',       'Alvará'),
+  ('op_bombeiro',     'Bombeiro'),
+  ('op_vigilancia',   'Vigilância Sanitária'),
+  ('op_conselho',     'Conselho de Classe'),
+] %}
+{% set has_organs = lead.op_alvara == 'sim' or lead.op_bombeiro == 'sim' or lead.op_vigilancia == 'sim' or lead.op_conselho == 'sim' %}
+{% set organs_data = (lead.op_organs_data or '{}') | fromjson if lead.op_organs_data else {} %}
+
+<div class="card-modal-inner d-flex flex-column w-100" data-lead-id="{{ lead.id }}"
+  style="flex:1; min-height:0; overflow:hidden; height:85vh;">
+
+  <!-- ======== HEADER ======== -->
+  <div class="px-3 py-1 border-bottom bg-white d-flex align-items-start gap-2"
+    style="flex-shrink:0;">
+    <!-- Title column -->
+    <div class="flex-grow-1 d-flex flex-column" style="min-width:0; padding-top:4px;">
+      <!-- Row 1: prio + name + type badge + link badges -->
+      <div class="d-flex align-items-center gap-1" style="flex-wrap:nowrap; min-width:0;">
+        <span class="lead-prio-dot flex-shrink-0" data-prio="{{ lead.priority }}"></span>
+        <input type="text" class="form-control border-0 fw-bold px-0 text-dark lead-field shadow-none"
+          style="font-size:1rem;background:transparent;min-width:0;flex:1;" data-field="name"
+          value="{{ lead.name or '' }}" placeholder="Nome do processo">
+        <span class="badge bg-light text-secondary border px-2 fw-normal flex-shrink-0" style="font-size:10px;white-space:nowrap;">{{ type_data.name }}</span>
+        {% if parent %}
+        <button class="btn btn-sm btn-outline-primary open-parent-btn px-2 py-0 flex-shrink-0"
+          data-lead-id="{{ parent.id }}" style="font-size:10px;white-space:nowrap;">
+          <i class="bi bi-arrow-up-circle me-1"></i>{{ parent.name | truncate(20, true, '…') }}
+        </button>
+        {% elif lead.parent_lead_id %}
+        <span class="badge flex-shrink-0" style="white-space:nowrap;background:#dbeafe;color:#1d4ed8;font-size:10px;">
+          <i class="bi bi-link-45deg me-1"></i>Vinculado
+        </span>
+        {% elif lead.organ_type %}
+        <span class="badge flex-shrink-0" style="white-space:nowrap;background:#f0fdf4;color:#16a34a;font-size:10px;">
+          <i class="bi bi-person-plus me-1"></i>Avulso
+        </span>
+        {% endif %}
+      </div>
+      <!-- Row 2: deadlines + tags (scrollable, no wrap) -->
+      <div class="d-flex gap-1 align-items-center ps-2 mt-1"
+        style="overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;-ms-overflow-style:none;padding-bottom:2px;">
+        {% if lead.due_date_junta and lead.status not in ('Concluído','Cancelado','Inativo Pedido Cliente') %}
+        <span class="badge px-2 py-1 fw-normal deadline-badge-junta flex-shrink-0"
+          style="background:#dbeafe;color:#1e40af;font-size:10px;"
+          data-due="{{ lead.due_date_junta }}"
+          title="Prazo CNPJ · {{ lead.due_date_junta }}">
+          <i class="bi bi-building me-1"></i>CNPJ: <span class="badge-days-text">—</span>
+        </span>
+        {% endif %}
+        {% if lead.due_date_nf and lead.status not in ('Concluído','Cancelado','Inativo Pedido Cliente') %}
+        <span class="badge px-2 py-1 fw-normal deadline-badge-nf flex-shrink-0"
+          style="background:#f0fdf4;color:#166534;font-size:10px;"
+          data-due="{{ lead.due_date_nf }}"
+          title="Prazo NF · {{ lead.due_date_nf }}">
+          <i class="bi bi-receipt me-1"></i>NF: <span class="badge-days-text">—</span>
+        </span>
+        {% endif %}
+        {% if lead.due_date %}
+        <span class="badge bg-light text-muted border px-2 py-1 fw-normal deadline-badge-total flex-shrink-0"
+          style="font-size:10px;"
+          data-due="{{ lead.due_date }}"
+          title="Prazo Alvará · {{ lead.due_date }}">
+          <i class="bi bi-shield-check me-1"></i>Alvará: <span class="badge-days-text">—</span>
+        </span>
+        {% endif %}
+        {% if current_stage_obj and current_stage_obj.sla_days and lead.stage_entered_at %}
+        <small class="lead-deadline badge bg-light text-secondary border px-2 py-1 flex-shrink-0"
+          data-entered="{{ lead.stage_entered_at }}"
+          data-sla="{{ current_stage_obj.sla_days }}"
+          style="font-size:10px;font-weight:500;white-space:nowrap;"></small>
+        {% endif %}
+        {% if lead.tags %}
+        {% for t in lead.tags %}
+        <span class="badge fw-normal px-2 py-1 flex-shrink-0"
+          style="font-size:10px;background:{{ t.color }}20;color:{{ t.color }};border:1px solid {{ t.color }}40;white-space:nowrap;">
+          {{ t.name }}
+        </span>
+        {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+    <!-- Actions -->
+    <div class="d-flex align-items-center gap-1 flex-shrink-0" style="padding-top:3px;">
+      <!-- Etiquetas dropdown -->
+      {% if tags %}
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary px-2 py-1" id="tagsDropBtn"
+          data-bs-toggle="dropdown" data-bs-auto-close="outside"
+          aria-expanded="false" title="Etiquetas">
+          <i class="bi bi-tags"></i>
+        </button>
+        <div class="dropdown-menu p-2" style="min-width:200px;max-height:260px;overflow-y:auto;">
+          <div class="small fw-semibold text-muted text-uppercase mb-2 px-1" style="font-size:10px;letter-spacing:.5px;">Etiquetas</div>
+          {% for t in tags %}
+          <label class="dropdown-item d-flex align-items-center gap-2 py-1 rounded" style="cursor:pointer;font-size:13px;">
+            <input type="checkbox" class="form-check-input tag-check m-0 flex-shrink-0" value="{{ t.id }}"
+              {% if lead.tags and t.id in (lead.tags | map(attribute='id') | list) %}checked{% endif %}>
+            <span class="badge fw-normal px-2 py-1"
+              style="background:{{ t.color }}20;color:{{ t.color }};border:1px solid {{ t.color }}40;">
+              {{ t.name }}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <!-- Link portal cliente -->
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary px-2 py-1 dropdown-toggle" title="Link do cliente"
+          id="portalDropBtn" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-link-45deg"></i>
+        </button>
+        <div class="dropdown-menu p-3" style="min-width:320px;" id="portalDropMenu">
+          <div class="small fw-semibold mb-2">Link de acompanhamento</div>
+          <div class="input-group input-group-sm mb-2">
+            <input type="text" class="form-control font-monospace" id="portalLinkInput" readonly placeholder="Clique em Gerar…" style="font-size:.74rem;">
+            <button class="btn btn-outline-secondary" id="portalCopyBtn" title="Copiar link" disabled>
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-primary flex-grow-1" id="portalGerarBtn"
+              data-lead-id="{{ lead.id }}">
+              <i class="bi bi-magic me-1"></i>Gerar link
+            </button>
+          </div>
+          <div class="text-muted mt-2" style="font-size:.72rem;">
+            Envie este link ao cliente para ele acompanhar o processo.
+          </div>
+        </div>
+      </div>
+      {% if session.get('profile') in ('admin', 'gerente') %}
+      <button class="btn btn-sm btn-outline-danger lead-delete-btn px-2 py-1" title="Excluir processo">
+        <i class="bi bi-trash"></i>
+      </button>
+      {% endif %}
+      <button class="btn btn-sm btn-dark px-3 lead-save-all-btn">
+        <i class="bi bi-check2"></i> Salvar
+      </button>
+      <a href="/leads/{{ lead.id }}" class="btn btn-sm btn-link text-muted text-decoration-none p-0" title="Tela cheia">
+        <i class="bi bi-arrows-fullscreen"></i>
+      </a>
+      <button class="btn btn-sm btn-link text-muted card-modal-close p-0" title="Fechar">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ======== BODY: 2 columns ======== -->
+  <div class="d-flex flex-row flex-grow-1" style="min-height:0; overflow:hidden;">
+
+    <!-- ===== COL 1: Tabs (67%) ===== -->
+    <div class="d-flex flex-column border-end" style="width:67%; min-height:0;">
+
+      <!-- Sub-header: fields -->
+      <div class="px-3 pt-2 pb-1 border-bottom bg-white" style="flex-shrink:0;">
+        <div class="row g-2">
+          <!-- Escritório -->
+          <div class="col-12">
+            <label class="form-label small text-muted mb-1">Escritório</label>
+            <select class="form-select form-select-sm rounded-2 lead-field" data-field="office_id">
+              <option value="">— sem escritório —</option>
+              {% for o in offices %}
+              <option value="{{ o.id }}" {% if lead.office_id == o.id %}selected{% endif %}>{{ o.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <!-- Responsável -->
+          <div class="col-6">
+            <label class="form-label small text-muted mb-1">Responsável</label>
+            <select class="form-select form-select-sm rounded-2 lead-field" data-field="responsible_name">
+              <option value="">— selecione —</option>
+              {% for u in users %}
+              <option value="{{ u.name }}" {% if lead.responsible_name == u.name %}selected{% endif %}>{{ u.name }}</option>
+              {% endfor %}
+              {% if lead.responsible_name and lead.responsible_name not in (users | map(attribute='name') | list) %}
+              <option value="{{ lead.responsible_name }}" selected>{{ lead.responsible_name }}</option>
+              {% endif %}
+            </select>
+          </div>
+          <!-- Status -->
+          <div class="col-6">
+            <label class="form-label small text-muted mb-1">Status</label>
+            <select class="form-select form-select-sm rounded-2 lead-field" data-field="status">
+              {% for s in statuses %}
+              <option value="{{ s.name }}" {% if lead.status==s.name %}selected{% endif %}>{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <!-- Prioridade -->
+          <div class="col-6">
+            <label class="form-label small text-muted mb-1">Prioridade</label>
+            <select class="form-select form-select-sm rounded-2 lead-field" data-field="priority">
+              {% for p in priorities %}
+              <option value="{{ p.name }}" {% if lead.priority==p.name %}selected{% endif %}>{{ p.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <!-- Etapa -->
+          <div class="col-12">
+            <label class="form-label small text-muted mb-1">Etapa atual</label>
+            <div class="stage-picker-container"
+              data-stages='{{ stages|tojson }}'
+              data-current="{{ lead.current_stage_id }}"
+              data-current-stage-name="{{ stages | selectattr('id', 'equalto', lead.current_stage_id) | map(attribute='name') | first | default('') }}"
+              data-stages-positions='{{ stages | map(attribute="id") | list | tojson }}'></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs nav -->
+      <ul class="nav nav-tabs px-2 pt-1 flex-nowrap overflow-x-auto border-bottom bg-light" role="tablist"
+        style="flex-shrink:0;">
+        <li class="nav-item">
+          <button class="nav-link active py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#tab-op">
+            {% if lead.organ_type %}<i class="bi bi-building me-1"></i>{% endif %}Operacional
+          </button>
+        </li>
+        {% if not lead.organ_type %}
+        <li class="nav-item">
+          <button class="nav-link py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#tab-form">
+            Formulário
+          </button>
+        </li>
+        {% endif %}
+        <li class="nav-item">
+          <button class="nav-link py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#tab-check">
+            Checklist
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#tab-files">
+            Arquivos
+          </button>
+        </li>
+        {% if not lead.organ_type %}
+        <li class="nav-item">
+          <button class="nav-link py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#tab-organs">
+            <i class="bi bi-building-gear me-1"></i>Órgãos
+          </button>
+        </li>
+        {% endif %}
+        {% if children %}
+        <li class="nav-item">
+          <button class="nav-link py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#tab-children">
+            <i class="bi bi-diagram-3 me-1"></i>Licenças
+            <span class="badge bg-secondary ms-1" style="font-size:9px;">{{ children|length }}</span>
+          </button>
+        </li>
+        {% endif %}
+      </ul>
+
+      <!-- Tab content -->
+      <div class="tab-content flex-grow-1 overflow-y-auto">
+
+        {# ---- OPERACIONAL ---- #}
+        <div class="tab-pane fade show active p-3" id="tab-op">
+
+          {# --- CNAE análise de baixo risco (mostra quando tem ficha vinculada) --- #}
+          {% if cnae_analysis %}
+          <div class="p-3 border rounded-3 mb-3 {% if all_baixo_risco %}border-success bg-success-subtle{% elif any_baixo_risco %}border-warning bg-warning-subtle{% else %}border-0 bg-light{% endif %}">
+            <h6 class="fw-bold mb-2 small text-uppercase text-muted d-flex align-items-center gap-2">
+              <i class="bi bi-robot"></i>Análise de Baixo Risco (Paraná — Dec. 3.434/2025)
+            </h6>
+            {% for a in cnae_analysis %}
+            <div class="d-flex align-items-center gap-2 mb-1">
+              {% if a.is_baixo_risco %}
+              <i class="bi bi-check-circle-fill text-success" style="font-size:13px;"></i>
+              {% else %}
+              <i class="bi bi-dash-circle text-muted" style="font-size:13px;"></i>
+              {% endif %}
+              <span class="small">
+                <code style="font-size:11px;">{{ a.cnae }}</code>
+                {% if a.principal %}<span class="badge bg-primary-subtle text-primary border ms-1" style="font-size:9px;">Principal</span>{% endif %}
+                {% if a.is_baixo_risco %}<span class="badge bg-success-subtle text-success border ms-1" style="font-size:9px;">Baixo Risco</span>{% endif %}
+              </span>
+              <span class="text-muted small">{{ a.descricao }}</span>
+            </div>
+            {% endfor %}
+            {% if any_baixo_risco and lead.op_baixo_risco != 'sim' %}
+            <div class="mt-2 pt-2 border-top d-flex align-items-center gap-2">
+              <i class="bi bi-info-circle text-warning"></i>
+              <span class="small text-muted">Atividade(s) classificada(s) como baixo risco pela IA. Deseja marcar o processo como baixo risco?</span>
+              <button class="btn btn-sm btn-success px-2 py-0" id="markBaixoRiscoBtn" style="font-size:11px;white-space:nowrap;">
+                <i class="bi bi-check2 me-1"></i>Marcar
+              </button>
+            </div>
+            {% elif lead.op_baixo_risco == 'sim' %}
+            <div class="mt-2 pt-2 border-top">
+              <span class="badge bg-success-subtle text-success border" style="font-size:10px;">
+                <i class="bi bi-robot me-1"></i>Marcado como baixo risco — análise por IA
+              </span>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          {% if lead.organ_type %}
+          {# ========= ORGAN CARD simplified operacional ========= #}
+          {% set organ_labels = {'bombeiro': 'Bombeiro', 'vigilancia': 'Vigilância Sanitária', 'conselho': 'Conselho de Classe', 'alvara': 'Alvará'} %}
+          {% set organ_icons  = {'bombeiro': 'bi-fire', 'vigilancia': 'bi-clipboard2-pulse', 'conselho': 'bi-person-badge', 'alvara': 'bi-building-check'} %}
+          {% set organ_key = 'op_' ~ lead.organ_type %}
+          {% set parent_br = (parent.op_baixo_risco if parent else lead.op_baixo_risco) or '' %}
+          {% if parent and parent.op_organs_data %}
+            {% set _pod = parent.op_organs_data | fromjson %}
+            {% set od = _pod.get(organ_key, {}) %}
+          {% else %}
+            {% set od = {} %}
+          {% endif %}
+          {% set has_sem_ativ = lead.tags and (lead.tags | selectattr('name', 'equalto', 'Sem atividade no local') | list | length > 0) %}
+          {% if parent and parent.tags %}
+            {% set has_sem_ativ = parent.tags | selectattr('name', 'equalto', 'Sem atividade no local') | list | length > 0 %}
+          {% endif %}
+
+          <!-- Status / flags -->
+          <div class="p-3 border rounded-3 mb-3 bg-light">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <i class="bi {{ organ_icons.get(lead.organ_type, 'bi-building') }} fs-5 text-primary"></i>
+              <span class="fw-bold">{{ organ_labels.get(lead.organ_type, lead.organ_type | title) }}</span>
+            </div>
+
+            <!-- Baixo Risco — somente leitura, herdado do processo pai -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="small">Atividade de Baixo Risco</span>
+              {% if parent_br == 'sim' %}
+              <span class="badge bg-success-subtle text-success border" style="font-size:11px;"><i class="bi bi-check-circle me-1"></i>Sim</span>
+              {% elif parent_br == 'nao' %}
+              <span class="badge bg-danger-subtle text-danger border" style="font-size:11px;"><i class="bi bi-x-circle me-1"></i>Não</span>
+              {% else %}
+              <span class="badge bg-light text-muted border" style="font-size:11px;">Não definido</span>
+              {% endif %}
+            </div>
+
+            <!-- Sem atividade no local (tag automática, leitura) -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="small">Sem atividade no local</span>
+              {% if has_sem_ativ %}
+              <span class="badge bg-warning-subtle text-warning border" style="font-size:10px;"><i class="bi bi-tag me-1"></i>Etiquetado</span>
+              {% else %}
+              <span class="badge bg-light text-muted border" style="font-size:10px;">Não aplicável</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Dados do Órgão (editável, salva no pai) -->
+          <div class="p-3 border rounded-3 mb-3"
+               data-organ-card-key="{{ organ_key }}"
+               data-organ-parent-id="{{ parent.id if parent else '' }}">
+            <h6 class="fw-bold mb-3 small text-uppercase text-muted">
+              <i class="bi bi-clipboard-data me-1"></i>Dados do Processo
+            </h6>
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <label class="form-label small text-muted mb-1">Nº do Protocolo</label>
+                <input type="text" class="form-control form-control-sm organ-child-field" data-ofield="protocolo"
+                  value="{{ od.get('protocolo', '') }}" placeholder="Ex: 2024/00123">
+              </div>
+              <div class="col-6">
+                <label class="form-label small text-muted mb-1">Última atualização</label>
+                <input type="date" class="form-control form-control-sm organ-child-field" data-ofield="ultima_atualizacao"
+                  value="{{ od.get('ultima_atualizacao', '') }}">
+              </div>
+              <div class="col-12">
+                <label class="form-label small text-muted mb-1">URL do processo</label>
+                <input type="url" class="form-control form-control-sm organ-child-field" data-ofield="url"
+                  value="{{ od.get('url', '') }}" placeholder="https://...">
+              </div>
+              <div class="col-12">
+                <label class="form-label small text-muted mb-1">Descrição / Observação</label>
+                <textarea class="form-control form-control-sm organ-child-field" rows="2" data-ofield="observacao"
+                  placeholder="Anotações sobre este processo...">{{ od.get('observacao', '') }}</textarea>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-primary organ-child-save-btn">
+              <i class="bi bi-check2 me-1"></i>Salvar dados
+            </button>
+          </div>
+
+          {% else %}
+          {# ========= NORMAL CARD Operacional ========= #}
+          <!-- Flags Sim/Não -->
+          <div class="px-2 py-2 border rounded-3 mb-2">
+            <div class="fw-bold mb-1 text-uppercase text-muted" style="font-size:10px;letter-spacing:.04em;">Licenças / Aprovações</div>
+            <div class="d-flex flex-column gap-1">
+              {% for fkey, flabel in op_flags %}
+              {% set fval = lead[fkey] if lead[fkey] else '' %}
+              {% set is_disabled = (fkey in ('op_bombeiro', 'op_vigilancia')) and lead.op_baixo_risco == 'sim' %}
+              <div class="d-flex justify-content-between align-items-center py-0">
+                <span style="font-size:12px;" class="{% if is_disabled %}text-muted{% endif %}">
+                  {{ flabel }}
+                  {% if is_disabled %}<span class="badge bg-light text-muted border ms-1" style="font-size:9px;">Dispensado</span>{% endif %}
+                </span>
+                <div class="btn-group op-flag-group {% if is_disabled %}op-flag-disabled{% endif %}"
+                  data-field="{{ fkey }}" {% if is_disabled %}data-disabled="true"{% endif %}
+                  style="font-size:11px;">
+                  <button type="button" class="btn btn-sm op-flag-btn py-0 px-2 {% if not is_disabled and fval == 'sim' %}btn-success{% else %}btn-outline-secondary{% endif %}"
+                    data-val="sim" {% if is_disabled %}disabled{% endif %}>Sim</button>
+                  <button type="button" class="btn btn-sm op-flag-btn py-0 px-2 {% if not is_disabled and fval == 'nao' %}btn-danger{% else %}btn-outline-secondary{% endif %}"
+                    data-val="nao" {% if is_disabled %}disabled{% endif %}>Não</button>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- URL Junta Comercial — edit/view style -->
+          <div class="mb-2">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <span class="form-label small text-muted mb-0">URL do processo na Junta Comercial</span>
+              <button id="juntaUrlEditBtn" class="btn p-0 border-0 bg-transparent text-muted" style="font-size:11px;" title="Editar URL">
+                <i class="bi bi-pencil-square"></i>
+              </button>
+            </div>
+            <!-- View mode -->
+            <div id="juntaUrlView">
+              {% if lead.op_url_junta %}
+              <a href="{{ lead.op_url_junta }}" target="_blank" rel="noopener"
+                class="small text-primary d-inline-flex align-items-center gap-1" style="word-break:break-all;">
+                <i class="bi bi-box-arrow-up-right flex-shrink-0"></i>{{ lead.op_url_junta }}
+              </a>
+              {% else %}
+              <span class="small text-muted fst-italic">— clique no lápis para adicionar a URL —</span>
+              {% endif %}
+            </div>
+            <!-- Edit mode -->
+            <div id="juntaUrlEdit" class="d-none">
+              <input type="text" id="juntaUrlInput" class="form-control form-control-sm mb-2"
+                value="{{ lead.op_url_junta or '' }}"
+                placeholder="https://...">
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-dark flex-grow-1 py-1" id="juntaUrlSaveBtn" style="font-size:12px;">
+                  <i class="bi bi-check2 me-1"></i>Salvar
+                </button>
+                <button class="btn btn-sm btn-outline-secondary py-1" id="juntaUrlCancelBtn" style="font-size:12px;">Cancelar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Link de Assinatura Junta Comercial — edit/view style -->
+          <div class="mb-2">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <span class="form-label small text-muted mb-0">
+                <i class="bi bi-pen me-1 text-warning"></i>Link de Assinatura — Junta Comercial
+              </span>
+              <button id="assinaturaLinkEditBtn" class="btn p-0 border-0 bg-transparent text-muted" style="font-size:11px;" title="Editar link de assinatura">
+                <i class="bi bi-pencil-square"></i>
+              </button>
+            </div>
+            <div class="small text-muted mb-1" style="font-size:10px;line-height:1.4;">
+              Quando preenchido, este link aparece no painel do cliente para assinatura digital.
+            </div>
+            <!-- View mode -->
+            <div id="assinaturaLinkView">
+              {% if lead.op_link_assinatura_junta %}
+              <a href="{{ lead.op_link_assinatura_junta }}" target="_blank" rel="noopener"
+                class="small text-warning d-inline-flex align-items-center gap-1 fw-semibold" style="word-break:break-all;">
+                <i class="bi bi-pen-fill flex-shrink-0"></i>{{ lead.op_link_assinatura_junta }}
+              </a>
+              {% else %}
+              <span class="small text-muted fst-italic">— clique no lápis para adicionar o link de assinatura —</span>
+              {% endif %}
+            </div>
+            <!-- Edit mode -->
+            <div id="assinaturaLinkEdit" class="d-none">
+              <input type="text" id="assinaturaLinkInput" class="form-control form-control-sm mb-2"
+                value="{{ lead.op_link_assinatura_junta or '' }}"
+                placeholder="https://...">
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-warning flex-grow-1 py-1 text-dark fw-semibold" id="assinaturaLinkSaveBtn" style="font-size:12px;">
+                  <i class="bi bi-check2 me-1"></i>Salvar
+                </button>
+                <button class="btn btn-sm btn-outline-secondary py-1" id="assinaturaLinkCancelBtn" style="font-size:12px;">Cancelar</button>
+              </div>
+            </div>
+          </div>
+
+
+          <!-- Approval Panel (shown when stage = Em Aprovação com Cliente) -->
+          <div id="approvalPanel" class="mt-3 p-3 border rounded-3 bg-light" style="display:none;">
+            <h6 class="small fw-bold text-uppercase text-muted mb-2">
+              <i class="bi bi-person-check me-1"></i>Aprovação do Cliente
+            </h6>
+            <div id="approvalStatus">
+              <p class="small text-muted mb-2">Gere um link de aprovação para enviar ao cliente.</p>
+              <button class="btn btn-sm btn-primary" id="generateApprovalBtn">
+                <i class="bi bi-link-45deg me-1"></i>Gerar Link de Aprovação
+              </button>
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+
+        {# ---- FORMULÁRIO ---- #}
+        <div class="tab-pane fade p-3" id="tab-form">
+          {% set tname = (type_data.name or '') | lower %}
+          {% if ficha_data %}
+            <div class="p-3 border rounded-3 bg-light mb-3 d-flex align-items-center justify-content-between">
+              <div>
+                <div class="fw-bold">{{ ficha_data.razao_social or '(sem nome)' }}</div>
+                <div class="text-muted small">
+                  {{ 'Constituição' if ficha_data.tipo == 'constituicao' else 'Alteração' }}
+                  · Atualizado: {{ ficha_data.atualizado_em[:16]|replace('T',' ') }}
+                </div>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                {% if ficha_data.tipo == 'constituicao' %}
+                <a href="/constituicao/{{ ficha_data.id }}/editar" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-pencil"></i> Editar
+                </a>
+                <a href="/api/leads/{{ lead.id }}/contrato-html" target="_blank" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-file-earmark-text"></i> Ver Contrato
+                </a>
+                <a href="/constituicao/{{ ficha_data.id }}/gerar" class="btn btn-sm btn-outline-secondary" title="Baixar DOCX">
+                  <i class="bi bi-file-earmark-arrow-down"></i> DOCX
+                </a>
+                {% else %}
+                <a href="/alteracao/{{ ficha_data.id }}/editar" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-pencil"></i> Editar
+                </a>
+                <a href="/api/leads/{{ lead.id }}/contrato-html" target="_blank" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-file-earmark-text"></i> Ver Contrato
+                </a>
+                <a href="/alteracao/{{ ficha_data.id }}/gerar" class="btn btn-sm btn-outline-secondary" title="Baixar DOCX">
+                  <i class="bi bi-file-earmark-arrow-down"></i> DOCX
+                </a>
+                {% endif %}
+                <a href="/leads/{{ lead.id }}/formulario-resumo" target="_blank" class="btn btn-sm btn-outline-info">
+                  <i class="bi bi-card-list"></i> Formulário
+                </a>
+              </div>
+            </div>
+          {% elif 'abertura' in tname or 'constitui' in tname %}
+            <div class="text-center py-4 px-3 bg-light rounded-3 border">
+              <i class="bi bi-file-earmark-plus fs-2 text-primary mb-2 d-block"></i>
+              <h6 class="fw-bold mb-2">Iniciar Constituição</h6>
+              <p class="text-muted small mb-3">Preencha o formulário para este processo. Ao salvar, a ficha ficará vinculada automaticamente.</p>
+              <a href="/constituicao/nova?lead_id={{ lead.id }}" class="btn btn-primary btn-sm px-4">
+                <i class="bi bi-plus-circle me-1"></i> Iniciar
+              </a>
+            </div>
+          {% elif 'altera' in tname %}
+            <div class="text-center py-4 px-3 bg-light rounded-3 border">
+              <i class="bi bi-file-earmark-diff fs-2 text-warning mb-2 d-block"></i>
+              <h6 class="fw-bold mb-2">Iniciar Alteração</h6>
+              <p class="text-muted small mb-3">Preencha o formulário de alteração contratual. Ao salvar, a ficha ficará vinculada automaticamente.</p>
+              <a href="/alteracao/nova?lead_id={{ lead.id }}" class="btn btn-warning btn-sm px-4">
+                <i class="bi bi-file-earmark-diff me-1"></i> Iniciar
+              </a>
+            </div>
+          {% else %}
+            <div class="text-center py-4 px-3 bg-light rounded-3 border">
+              <i class="bi bi-tools fs-2 text-secondary mb-2 d-block"></i>
+              <h6 class="fw-bold mb-2">Formulário em desenvolvimento</h6>
+              <p class="text-muted small">Este tipo de serviço ainda não possui formulário integrado.</p>
+            </div>
+          {% endif %}
+        </div>
+
+        {# ---- CHECKLIST ---- #}
+        <div class="tab-pane fade p-3" id="tab-check">
+          <div id="checklistHost" data-items='{{ checklist|tojson }}'
+            data-stages='{{ stages|tojson }}'
+            data-current-stage="{{ lead.current_stage_id }}"
+            data-stage-templates='{{ stage_templates|tojson }}'
+            data-lead-id="{{ lead.id }}"></div>
+        </div>
+
+        {# ---- ARQUIVOS ---- #}
+        <div class="tab-pane fade p-3" id="tab-files">
+          <div class="d-flex justify-content-between mb-2 align-items-center">
+            <span class="small text-muted fw-bold text-uppercase">Arquivos anexados</span>
+            <label class="btn btn-sm btn-dark rounded-2">
+              <i class="bi bi-cloud-upload"></i> Enviar
+              <input type="file" id="fileInput" hidden>
+            </label>
+          </div>
+          <ul class="list-group list-group-flush rounded-3 border" id="fileList">
+            {% for f in files %}
+            <li class="list-group-item d-flex justify-content-between align-items-center" data-file-id="{{ f.id }}">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-file-earmark text-muted"></i>
+                <a href="/api/leads/files/{{ f.id }}" class="text-dark text-decoration-none fw-semibold" style="font-size:13px;">{{ f.filename }}</a>
+                <small class="text-muted" style="font-size:11px;">{{ (f.size_bytes/1024)|round(1) if f.size_bytes else '—' }} KB</small>
+              </div>
+              <button class="btn btn-sm btn-link text-danger file-delete p-0"><i class="bi bi-trash"></i></button>
+            </li>
+            {% else %}
+            <li class="list-group-item text-muted text-center py-3 bg-light border-0 small">Nenhum documento.</li>
+            {% endfor %}
+          </ul>
+
+          {# ---- Declarações e documentos (todos os cards) ---- #}
+          {% set _all_tags = (lead.tags or []) + (parent.tags if parent and parent.tags else []) %}
+          {% set _has_sem_ativ = _all_tags | selectattr('name', 'equalto', 'Sem atividade no local') | list | length > 0 %}
+          <div class="mt-4">
+            <h6 class="small fw-bold text-uppercase text-muted mb-2">
+              <i class="bi bi-file-earmark-text me-1"></i>Declarações e Documentos
+            </h6>
+            <div class="d-flex flex-column gap-2">
+
+              <!-- Declaração sem atividade no local -->
+              <div class="d-flex align-items-center justify-content-between p-2 border rounded-2 {% if not _has_sem_ativ %}bg-light{% endif %}">
+                <div style="min-width:0;">
+                  <div class="small fw-semibold">Declaração de Não Exercício de Atividade no Local</div>
+                  {% if not _has_sem_ativ %}
+                  <div class="text-muted" style="font-size:10px;">Habilitada quando a empresa não exerce atividade no local</div>
+                  {% endif %}
+                </div>
+                {% if _has_sem_ativ %}
+                <a href="/api/leads/{{ lead.id }}/gerar-declaracao/sem_atividade"
+                  class="btn btn-sm btn-outline-primary px-2 ms-2 flex-shrink-0" download>
+                  <i class="bi bi-file-earmark-word me-1"></i>Baixar
+                </a>
+                {% else %}
+                <button class="btn btn-sm btn-outline-secondary px-2 ms-2 flex-shrink-0" disabled>
+                  <i class="bi bi-file-earmark-word me-1"></i>Baixar
+                </button>
+                {% endif %}
+              </div>
+
+              <!-- Declaração sem funcionários -->
+              <div class="d-flex align-items-center justify-content-between p-2 border rounded-2">
+                <div>
+                  <div class="small fw-semibold">Declaração de Ausência de Empregados</div>
+                </div>
+                <a href="/api/leads/{{ lead.id }}/gerar-declaracao/sem_funcionarios"
+                  class="btn btn-sm btn-outline-primary px-2 ms-2 flex-shrink-0" download>
+                  <i class="bi bi-file-earmark-word me-1"></i>Baixar
+                </a>
+              </div>
+
+              <!-- Geração por IA -->
+              <div class="p-2 border rounded-2">
+                <div class="small fw-semibold mb-2">
+                  <i class="bi bi-robot me-1 text-primary"></i>Gerar Documento com IA
+                </div>
+                <textarea id="iaDocContexto" class="form-control form-control-sm mb-2" rows="3"
+                  placeholder="Descreva o documento que precisa gerar (ex: requerimento de vistoria, declaração de capacidade técnica, etc.)..."></textarea>
+                <button class="btn btn-sm btn-dark w-100" id="iaDocGerarBtn">
+                  <i class="bi bi-stars me-1"></i>Gerar e baixar documento (.docx)
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        {# ---- ÓRGÃOS (sempre visível para cards não-órgão) ---- #}
+        {% if not lead.organ_type %}
+        <div class="tab-pane fade p-3" id="tab-organs">
+          {% for fkey, flabel in organ_types %}
+          {% if lead[fkey] == 'sim' %}
+          {% set od = organs_data.get(fkey, {}) %}
+          <div class="card mb-3 border-0 shadow-sm">
+            <div class="card-header bg-white d-flex align-items-center justify-content-between py-2">
+              <span class="fw-bold small">
+                <i class="bi bi-building me-1 text-primary"></i>{{ flabel }}
+              </span>
+              <span class="badge bg-success">Ativo</span>
+            </div>
+            <div class="card-body p-3" data-organ-key="{{ fkey }}">
+              <div class="row g-2 mb-2">
+                <div class="col-6">
+                  <label class="form-label small text-muted mb-1">Nº do Protocolo</label>
+                  <input type="text" class="form-control form-control-sm organ-field" data-organ="{{ fkey }}" data-ofield="protocolo"
+                    value="{{ od.get('protocolo', '') }}" placeholder="Ex: 2024/00123">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small text-muted mb-1">Última atualização</label>
+                  <input type="date" class="form-control form-control-sm organ-field" data-organ="{{ fkey }}" data-ofield="ultima_atualizacao"
+                    value="{{ od.get('ultima_atualizacao', '') }}">
+                </div>
+                <div class="col-12">
+                  <label class="form-label small text-muted mb-1">URL do processo</label>
+                  <input type="url" class="form-control form-control-sm organ-field" data-organ="{{ fkey }}" data-ofield="url"
+                    value="{{ od.get('url', '') }}" placeholder="https://...">
+                </div>
+                <div class="col-12">
+                  <label class="form-label small text-muted mb-1">Descrição / Observação</label>
+                  <textarea class="form-control form-control-sm organ-field" rows="2" data-organ="{{ fkey }}" data-ofield="observacao"
+                    placeholder="Anotações sobre este processo...">{{ od.get('observacao', '') }}</textarea>
+                </div>
+              </div>
+              <button class="btn btn-sm btn-primary organ-save-btn" data-organ="{{ fkey }}">
+                <i class="bi bi-check2 me-1"></i>Salvar {{ flabel }}
+              </button>
+              <!-- Histórico específico deste órgão -->
+              {% set organ_hist = history | selectattr('field', 'equalto', 'organ_' ~ fkey) | list %}
+              {% if organ_hist %}
+              <div class="mt-3 border-top pt-2">
+                <div class="small text-muted fw-bold mb-2">Histórico</div>
+                {% for h in organ_hist %}
+                <div class="small text-muted d-flex justify-content-between">
+                  <span>{{ h.new_value or '' }}</span>
+                  <span class="ts-local" data-ts="{{ h.created_at }}">{{ h.created_at[:16]|replace('T',' ') }}</span>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+          {% endfor %}
+
+          {# Criação manual de cards de órgão #}
+          {% set existing_organs = children | map(attribute='organ_type') | list %}
+          {% set missing_organs = [] %}
+          {% if 'bombeiro' not in existing_organs %}{% set _ = missing_organs.append('bombeiro') %}{% endif %}
+          {% if 'vigilancia' not in existing_organs %}{% set _ = missing_organs.append('vigilancia') %}{% endif %}
+          {% if 'conselho' not in existing_organs %}{% set _ = missing_organs.append('conselho') %}{% endif %}
+          {% if 'alvara' not in existing_organs %}{% set _ = missing_organs.append('alvara') %}{% endif %}
+          {% if missing_organs %}
+          <div class="mt-2 pt-3 border-top">
+            <div class="small text-muted fw-bold mb-2">
+              <i class="bi bi-plus-circle me-1"></i>Criar card de órgão
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              {% if 'bombeiro' in missing_organs %}
+              <button class="btn btn-sm btn-outline-danger create-organ-child-btn" data-organ-type="bombeiro">
+                <i class="bi bi-fire me-1"></i>Bombeiro
+              </button>
+              {% endif %}
+              {% if 'vigilancia' in missing_organs %}
+              <button class="btn btn-sm btn-outline-warning create-organ-child-btn" data-organ-type="vigilancia">
+                <i class="bi bi-shield-plus me-1"></i>Vigilância
+              </button>
+              {% endif %}
+              {% if 'conselho' in missing_organs %}
+              <button class="btn btn-sm btn-outline-primary create-organ-child-btn" data-organ-type="conselho">
+                <i class="bi bi-award me-1"></i>Conselho
+              </button>
+              {% endif %}
+              {% if 'alvara' in missing_organs %}
+              <button class="btn btn-sm btn-outline-success create-organ-child-btn" data-organ-type="alvara">
+                <i class="bi bi-patch-check me-1"></i>Alvará
+              </button>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {# ---- LICENÇAS (filhos vinculados) ---- #}
+        {% if children %}
+        <div class="tab-pane fade p-3" id="tab-children">
+          <p class="small text-muted mb-3">Cards filhos gerados a partir deste processo. Clique em um card para abrir.</p>
+          {% set _status_colors = {
+            'Aberto': 'bg-primary-subtle text-primary',
+            'Em Andamento': 'bg-info-subtle text-info',
+            'Concluído': 'bg-success-subtle text-success',
+            'Cancelado': 'bg-danger-subtle text-danger',
+            'Inativo Pedido Cliente': 'bg-warning-subtle text-warning',
+          } %}
+          <div class="d-flex flex-column gap-2">
+            {% for child in children %}
+            <div class="card border-0 shadow-sm child-lead-card" style="cursor:pointer;"
+              data-lead-id="{{ child.id }}">
+              <div class="card-body p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-2">
+                    {% if child.type_color %}
+                    <span class="rounded-circle d-inline-block flex-shrink-0"
+                      style="width:8px;height:8px;background:{{ child.type_color }};"></span>
+                    {% endif %}
+                    <span class="fw-semibold small">{{ child.name }}</span>
+                  </div>
+                  <span class="badge {{ _status_colors.get(child.status, 'bg-secondary-subtle text-secondary') }} fw-normal" style="font-size:10px;">
+                    {{ child.status }}
+                  </span>
+                </div>
+                <div class="mt-1 d-flex align-items-center gap-2">
+                  <span class="text-muted" style="font-size:11px;">
+                    <i class="bi bi-arrow-right-circle me-1"></i>{{ child.stage_name or '—' }}
+                  </span>
+                  {% if child.type_name %}
+                  <span class="badge bg-light text-secondary border" style="font-size:10px;">{{ child.type_name }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <!-- ===== COL 2: Right panel (33%) ===== -->
+    <div class="d-flex flex-column" style="width:33%; min-height:0; overflow:hidden; background:#f8fafc;">
+
+      <!-- DESCRIÇÃO -->
+      <div class="border-bottom" style="flex-shrink:0; background:#fff;">
+        <div class="px-3 pt-3 pb-1 d-flex align-items-center justify-content-between">
+          <span style="font-size:10px; font-weight:700; color:#94a3b8; letter-spacing:.8px; text-transform:uppercase;">Descrição</span>
+          <button id="descEditBtn" class="btn p-0 border-0 bg-transparent text-muted" style="font-size:11px;" title="Editar descrição">
+            <i class="bi bi-pencil-square"></i>
+          </button>
+        </div>
+        <!-- View mode -->
+        <div id="descView" class="px-3 pb-3 text-secondary"
+          style="font-size:12px; line-height:1.55; white-space:pre-wrap; min-height:36px; max-height:120px; overflow-y:auto; cursor:default;">{{ lead.description or '— clique em editar para adicionar uma descrição —' }}</div>
+        <!-- Edit mode -->
+        <div id="descEdit" class="px-3 pb-3 d-none">
+          <textarea id="descTextarea" class="form-control form-control-sm border shadow-none mb-2"
+            style="resize:none; font-size:12px; min-height:80px; background:#fff;"
+            placeholder="Anotações sobre este processo...">{{ lead.description or '' }}</textarea>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-dark flex-grow-1 py-1" id="descSaveBtn" style="font-size:12px;">
+              <i class="bi bi-check2 me-1"></i>Salvar
+            </button>
+            <button class="btn btn-sm btn-outline-secondary py-1" id="descCancelBtn" style="font-size:12px;">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHAT: ocupa todo o restante, flex coluna -->
+      <div class="d-flex flex-column" style="flex:1; min-height:0; overflow:hidden;">
+
+        <!-- Tabs: Comentários | Histórico -->
+        <div class="d-flex border-bottom bg-white" style="flex-shrink:0;">
+          <button class="flex-grow-1 py-2 border-0 bg-transparent fw-semibold chat-tab-btn active-chat-tab"
+            data-target="tab-chat"
+            style="font-size:11px; color:#1e293b; border-bottom:2px solid #1e293b !important;">
+            <i class="bi bi-chat-dots me-1"></i>Comentários
+            <span class="badge bg-secondary ms-1" style="font-size:9px;">{{ comments|length }}</span>
+          </button>
+          <button class="flex-grow-1 py-2 border-0 bg-transparent text-muted chat-tab-btn"
+            data-target="tab-hist"
+            style="font-size:11px; border-bottom:2px solid transparent;">
+            <i class="bi bi-clock-history me-1"></i>Histórico
+          </button>
+        </div>
+
+        <!-- COMENTÁRIOS -->
+        <div id="tab-chat" class="chat-panel d-flex flex-column" style="flex:1; min-height:0; overflow:hidden;">
+          <!-- Messages list -->
+          <div id="commentList" style="flex:1; overflow-y:auto; padding:12px 14px; min-height:0; display:flex; flex-direction:column; gap:10px;">
+            {% for c in comments %}
+            <div class="cmt-msg">
+              <div class="d-flex align-items-baseline justify-content-between mb-1">
+                <span style="font-size:11px; font-weight:600; color:#475569;">{{ c.author_name or 'Equipe' }}</span>
+                <span class="ts-local" data-ts="{{ c.created_at }}" style="font-size:10px; color:#94a3b8;">{{ c.created_at[8:10] }}/{{ c.created_at[5:7] }} {{ c.created_at[11:16] }}</span>
+              </div>
+              <div class="cmt-body" style="font-size:12px; color:#334155; line-height:1.5; white-space:pre-wrap;">{{ c.body }}</div>
+              {% if c.attachment_name %}
+              <div class="mt-1">
+                {% if (c.attachment_mime or '').startswith('image/') %}
+                <a href="/api/leads/comment-attachment/{{ c.attachment_key }}" target="_blank">
+                  <img src="/api/leads/comment-attachment/{{ c.attachment_key }}"
+                    style="max-width:180px; max-height:120px; border-radius:6px; border:1px solid #e2e8f0; margin-top:4px;">
+                </a>
+                {% else %}
+                <a href="/api/leads/comment-attachment/{{ c.attachment_key }}"
+                  class="d-inline-flex align-items-center gap-1 mt-1 text-decoration-none"
+                  style="font-size:11px; color:#2456a4; background:#eff6ff; padding:3px 8px; border-radius:4px;"
+                  download="{{ c.attachment_name }}">
+                  <i class="bi bi-paperclip"></i>{{ c.attachment_name }}
+                </a>
+                {% endif %}
+              </div>
+              {% endif %}
+            </div>
+            {% else %}
+            <div class="text-center text-muted my-auto" style="font-size:12px; opacity:.6;">
+              <i class="bi bi-chat-square-dots d-block mb-1" style="font-size:1.6rem;"></i>
+              Nenhum comentário ainda
+            </div>
+            {% endfor %}
+          </div>
+          <!-- Input fixo no fundo -->
+          <div style="flex-shrink:0; background:#fff; border-top:1px solid #e2e8f0; padding:8px 12px;">
+            <div class="d-flex align-items-end gap-2">
+              <textarea id="newComment"
+                style="flex:1; resize:none; font-size:12px; border:1px solid #e2e8f0; border-radius:8px; padding:7px 10px; min-height:36px; max-height:100px; outline:none; background:#f8fafc; line-height:1.4;"
+                rows="1"
+                placeholder="Comentar… use @nome para mencionar (Enter envia)"></textarea>
+              <div class="d-flex flex-column gap-1 align-items-center">
+                <label style="cursor:pointer; color:#94a3b8; font-size:16px; line-height:1;" title="Anexar arquivo">
+                  <i class="bi bi-paperclip"></i>
+                  <input type="file" id="commentAttachment" hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt">
+                </label>
+                <button id="addCommentBtn"
+                  style="background:#1e293b; border:none; color:#fff; border-radius:6px; width:30px; height:30px; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                  <i class="bi bi-send-fill" style="font-size:12px;"></i>
+                </button>
+              </div>
+            </div>
+            <div id="commentAttachmentName" style="font-size:10px; color:#94a3b8; margin-top:3px;"></div>
+          </div>
+        </div>
+
+        <!-- HISTÓRICO -->
+        <div id="tab-hist" class="chat-panel d-none" style="flex:1; overflow-y:auto; padding:12px 14px; min-height:0;">
+          {% if history %}
+          <div class="d-flex flex-column gap-3">
+            {% for h in history %}
+            {% if not h.field.startswith('organ_') and not h.field.startswith('op_') %}
+            <div style="border-left:2px solid #e2e8f0; padding-left:10px;">
+              <div class="d-flex justify-content-between align-items-baseline mb-1">
+                <span style="font-size:11px; font-weight:600; color:#475569;">{{ h.actor_name or 'Sistema' }}</span>
+                <span class="ts-local" data-ts="{{ h.created_at }}" style="font-size:10px; color:#94a3b8;">{{ h.created_at[8:10] }}/{{ h.created_at[5:7] }} {{ h.created_at[11:16] }}</span>
+              </div>
+              <div style="font-size:11px; color:#64748b; line-height:1.4;">
+                {% if h.field == 'current_stage_id' %}
+                <i class="bi bi-arrow-right-circle me-1 text-primary"></i>
+                Etapa: <strong style="color:#1e293b;">{{ h.new_value_name or h.new_value or '∅' }}</strong>
+                {% else %}
+                <span style="color:#94a3b8;">{{ h.field }}</span>
+                <i class="bi bi-arrow-right mx-1" style="font-size:9px;"></i>
+                <strong style="color:#1e293b;">{{ h.new_value or '∅' }}</strong>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-center text-muted my-auto" style="font-size:12px; opacity:.6; padding-top:40px;">
+            <i class="bi bi-clock d-block mb-1" style="font-size:1.6rem;"></i>
+            Sem histórico ainda
+          </div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>

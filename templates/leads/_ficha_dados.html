@@ -1,0 +1,322 @@
+{# ============================================================
+   Macro: render_ficha_dados(ficha_data)
+   Renders ALL fields from a constituicao or alteracao ficha.
+   Usage: {% from 'leads/_ficha_dados.html' import render_ficha_dados %}
+          {{ render_ficha_dados(ficha_data) }}
+   ============================================================ #}
+{% macro render_ficha_dados(ficha_data, compact=false) %}
+{% if not ficha_data %}
+<p class="text-muted small text-center py-3">Nenhum formulário preenchido para este processo.</p>
+{% else %}
+{% set dados = ficha_data.dados or {} %}
+{% set tipo = ficha_data.tipo %}
+
+{# ── CONSTITUIÇÃO ── #}
+{% if tipo == 'constituicao' %}
+  {% set emp = dados.get('empresa', {}) %}
+  {% set socios = emp.get('socios', []) %}
+  {% set end_c = emp.get('enderecoComercial', {}) %}
+  {% set atividades = emp.get('atividades', []) %}
+
+  {# Empresa #}
+  <div class="ficha-section">Empresa</div>
+  <div class="ficha-grid">
+    {% call field("Razão Social") %}{{ emp.get('razaoSocial','—') }}{% endcall %}
+    {% call field("Natureza Jurídica") %}{{ emp.get('naturezaJuridica','—') | replace('_',' ') | title }}{% endcall %}
+    {% call field("Classificação") %}{{ emp.get('classificacao','—') | upper }}{% endcall %}
+    {% call field("Capital Social") %}R$ {{ emp.get('capitalSocial','—') }}{% endcall %}
+    {% call field("Tipo de Administração") %}{{ emp.get('tipoAdministracao','—') | replace('_',' ') | title }}{% endcall %}
+    {% call field("Período de Apuração") %}{{ emp.get('periodoApuracao','—') }}{% endcall %}
+  </div>
+  {% if emp.get('objetoSocial') %}
+  <div class="ficha-field-full">
+    <div class="ficha-label">Objeto Social</div>
+    <div class="ficha-value-long">{{ emp.get('objetoSocial') }}</div>
+  </div>
+  {% endif %}
+
+  {# Endereço Comercial #}
+  {% if end_c %}
+  <div class="ficha-section">Endereço Comercial</div>
+  <div class="ficha-grid">
+    {% call field("Logradouro") %}{{ end_c.get('logradouroTipo','') }} {{ end_c.get('logradouroDescricao','—') }}, {{ end_c.get('numero','s/n') }}{% endcall %}
+    {% call field("Complemento") %}{{ end_c.get('complemento','—') }}{% endcall %}
+    {% call field("Bairro") %}{{ end_c.get('bairro','—') }}{% endcall %}
+    {% call field("Cidade / Estado") %}{{ end_c.get('cidade','—') }} / {{ end_c.get('estado','—') }}{% endcall %}
+    {% call field("CEP") %}{{ end_c.get('cep','—') }}{% endcall %}
+  </div>
+  {% endif %}
+
+  {# Atividades #}
+  {% if atividades %}
+  <div class="ficha-section">Atividades / CNAE</div>
+  {% for at in atividades %}
+    {% if at.get('cnae') or at.get('descricao') %}
+    <div class="ficha-atividade">
+      <span class="ficha-cnae-code">{{ at.get('cnae','—') }}</span>
+      <span class="ficha-cnae-desc">{{ at.get('descricao','—') }}</span>
+      {% if at.get('principal') %}<span class="ficha-badge ficha-badge-primary">Principal</span>{% endif %}
+      {% if at.get('desenvolvidaNoLocal') %}<span class="ficha-badge ficha-badge-light">No Local</span>{% endif %}
+    </div>
+    {% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {# Sócios #}
+  {% if socios %}
+  <div class="ficha-section">Sócios ({{ socios|length }})</div>
+  {% for s in socios %}
+  <div class="ficha-socio-block">
+    <div class="ficha-socio-header">
+      <span class="ficha-socio-name">{{ s.get('nome','—') }}</span>
+      {% if s.get('administrador') %}<span class="ficha-badge ficha-badge-primary">Administrador</span>
+      {% else %}<span class="ficha-badge ficha-badge-light">Sócio</span>{% endif %}
+      {% if s.get('tipoAdministracao') and s.get('administrador') %}
+        <span class="ficha-badge ficha-badge-light">Adm. {{ s.get('tipoAdministracao','') | replace('_',' ') | title }}</span>
+      {% endif %}
+    </div>
+    <div class="ficha-grid ficha-grid-3">
+      {% call field("CPF") %}{{ s.get('cpf','—') }}{% endcall %}
+      {% call field("Data de Nasc.") %}{{ s.get('dataNascimento','—') }}{% endcall %}
+      {% call field("Gênero") %}{{ s.get('genero','—') | title }}{% endcall %}
+      {% call field("Nacionalidade") %}{{ s.get('nacionalidade','—') | title }}{% endcall %}
+      {% call field("Estado Civil") %}{{ s.get('estadoCivil','—') | title }}
+        {% if s.get('uniaoEstavel') %} · União Estável{% if s.get('nomeCompanheiro') %} com {{ s.get('nomeCompanheiro') }}{% endif %}{% endif %}
+      {% endcall %}
+      {% call field("Regime de Bens") %}{{ s.get('regimeBens','—') | replace('_',' ') | title if s.get('regimeBens') else '—' }}{% endcall %}
+      {% call field("Profissão") %}{{ s.get('profissao','—') }}{% endcall %}
+      {% call field("Telefone") %}{{ s.get('telefone','—') }}{% endcall %}
+      {% call field("E-mail") %}{{ s.get('email','—') }}{% endcall %}
+      {% set doc = s.get('documentoIdentificacao', {}) %}
+      {% call field("Doc. Identificação") %}{{ doc.get('tipo','') | upper }} {{ doc.get('numero','') }}{% if doc.get('orgaoExpedidor') %} / {{ doc.get('orgaoExpedidor') }}{% endif %}{% if doc.get('dataExpedicao') %} ({{ doc.get('dataExpedicao') }}){% endif %}{% endcall %}
+      {% call field("Cotas") %}{{ s.get('quantidadeCotas','—') }} × R$ {{ s.get('valorUnitarioCota','1') }}{% endcall %}
+      {% set pc = ((s.get('quantidadeCotas',0) | float) / ([emp.get('capitalSocial',1)|float, 0.01]|max) * 100)|round(2) %}
+      {% call field("Participação") %}{{ pc }}%{% endcall %}
+    </div>
+    {% set end_s = s.get('endereco', {}) %}
+    {% if end_s.get('logradouroDescricao') or end_s.get('cidade') %}
+    <div class="ficha-label mt-1">Endereço Residencial</div>
+    <div class="ficha-value" style="font-size:.85em;">
+      {{ end_s.get('logradouroTipo','') }} {{ end_s.get('logradouroDescricao','') }}{% if end_s.get('numero') %}, {{ end_s.get('numero') }}{% endif %}
+      {% if end_s.get('complemento') %} — {{ end_s.get('complemento') }}{% endif %}
+      · {{ end_s.get('bairro','') }} · {{ end_s.get('cidade','') }}/{{ end_s.get('estado','') }} · CEP {{ end_s.get('cep','') }}
+    </div>
+    {% endif %}
+    {% if s.get('menorOuIncapaz') %}
+      {% set rep = s.get('representante', {}) %}
+      {% if rep %}
+      <div class="ficha-label mt-1" style="color:#b45309;">Representante Legal (menor/incapaz)</div>
+      <div class="ficha-grid" style="margin-top:.25rem;">
+        {% call field("Nome") %}{{ rep.get('nome','—') }}{% endcall %}
+        {% call field("CPF") %}{{ rep.get('cpf','—') }}{% endcall %}
+        {% call field("Tipo") %}{{ rep.get('tipo','—') | title }}{% endcall %}
+        {% call field("Estado Civil") %}{{ rep.get('estadoCivil','—') | title }}{% endcall %}
+        {% call field("Profissão") %}{{ rep.get('profissao','—') }}{% endcall %}
+        {% call field("Nacionalidade") %}{{ rep.get('nacionalidade','—') | title }}{% endcall %}
+      </div>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {# Cláusulas extras #}
+  {% set extras = dados.get('clausulas_extras', []) %}
+  {% if extras %}
+  <div class="ficha-section">Cláusulas Adicionais</div>
+  {% for cl in extras %}
+  <div class="ficha-field-full">
+    <div class="ficha-label">{{ cl.get('titulo','Cláusula') }}</div>
+    <div class="ficha-value-long">{{ cl.get('corpo','') }}</div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+{# ── ALTERAÇÃO ── #}
+{% else %}
+  {% set emp = dados.get('empresa_atual', {}) %}
+  {% set alts = dados.get('alteracoes', {}) %}
+
+  <div class="ficha-section">Empresa</div>
+  <div class="ficha-grid">
+    {% call field("Razão Social") %}{{ emp.get('razaoSocial','—') }}{% endcall %}
+    {% call field("CNPJ") %}{{ emp.get('cnpj','—') }}{% endcall %}
+    {% call field("NIRE") %}{{ emp.get('nire','—') }}{% endcall %}
+    {% call field("Capital Social") %}R$ {{ emp.get('capitalSocial','—') }}{% endcall %}
+    {% call field("N° da Alteração") %}{{ dados.get('numero_alteracao','—') }}{% endcall %}
+    {% call field("Data") %}{{ dados.get('data','—') }}{% endcall %}
+  </div>
+  {% if emp.get('objetoSocial') %}
+  <div class="ficha-field-full">
+    <div class="ficha-label">Objeto Social Atual</div>
+    <div class="ficha-value-long">{{ emp.get('objetoSocial') }}</div>
+  </div>
+  {% endif %}
+
+  {# Endereço atual #}
+  {% set end_a = emp.get('enderecoComercial', {}) %}
+  {% if end_a %}
+  <div class="ficha-section">Endereço Atual</div>
+  <div class="ficha-grid">
+    {% call field("Logradouro") %}{{ end_a.get('logradouroTipo','') }} {{ end_a.get('logradouroDescricao','—') }}, {{ end_a.get('numero','s/n') }}{% endcall %}
+    {% call field("Bairro") %}{{ end_a.get('bairro','—') }}{% endcall %}
+    {% call field("Cidade / Estado") %}{{ end_a.get('cidade','—') }} / {{ end_a.get('estado','—') }}{% endcall %}
+    {% call field("CEP") %}{{ end_a.get('cep','—') }}{% endcall %}
+  </div>
+  {% endif %}
+
+  {# Sócios atuais #}
+  {% set socios_atuais = emp.get('socios', []) %}
+  {% if socios_atuais %}
+  <div class="ficha-section">Quadro Societário Atual</div>
+  {% for s in socios_atuais %}
+  <div class="ficha-socio-block">
+    <div class="ficha-socio-header">
+      <span class="ficha-socio-name">{{ s.get('nome','—') }}</span>
+      {% if s.get('administrador') %}<span class="ficha-badge ficha-badge-primary">Administrador</span>{% endif %}
+    </div>
+    <div class="ficha-grid ficha-grid-3">
+      {% call field("CPF") %}{{ s.get('cpf','—') }}{% endcall %}
+      {% call field("Cotas") %}{{ s.get('quantidadeCotas','—') }}{% endcall %}
+      {% call field("Estado Civil") %}{{ s.get('estadoCivil','—') | title }}{% endcall %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {# Alterações #}
+  {% if alts.get('endereco', {}).get('ativo') %}
+  {% set end_novo = alts.get('endereco', {}).get('novo', {}) %}
+  <div class="ficha-section" style="color:#065f46;">Mudança de Endereço</div>
+  <div class="ficha-grid">
+    {% call field("Novo Logradouro") %}{{ end_novo.get('logradouroTipo','') }} {{ end_novo.get('logradouroDescricao','—') }}, {{ end_novo.get('numero','s/n') }}{% endcall %}
+    {% call field("Bairro") %}{{ end_novo.get('bairro','—') }}{% endcall %}
+    {% call field("Cidade / Estado") %}{{ end_novo.get('cidade','—') }} / {{ end_novo.get('estado','—') }}{% endcall %}
+    {% call field("CEP") %}{{ end_novo.get('cep','—') }}{% endcall %}
+  </div>
+  {% endif %}
+
+  {% if alts.get('objeto_social', {}).get('ativo') %}
+  <div class="ficha-section" style="color:#065f46;">Alteração do Objeto Social</div>
+  <div class="ficha-field-full">
+    <div class="ficha-label">Novo Objeto Social</div>
+    <div class="ficha-value-long">{{ alts.get('objeto_social', {}).get('novo','—') }}</div>
+  </div>
+  {% set ativs_novas = alts.get('objeto_social', {}).get('atividades', []) %}
+  {% if ativs_novas %}
+  <div class="ficha-label">Novas Atividades / CNAE</div>
+  {% for at in ativs_novas %}
+  <div class="ficha-atividade">
+    <span class="ficha-cnae-code">{{ at.get('cnae','—') }}</span>
+    <span class="ficha-cnae-desc">{{ at.get('descricao','—') }}</span>
+    {% if at.get('principal') %}<span class="ficha-badge ficha-badge-primary">Principal</span>{% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+  {% endif %}
+
+  {% if alts.get('nome_empresarial', {}).get('ativo') %}
+  <div class="ficha-section" style="color:#065f46;">Alteração do Nome Empresarial</div>
+  <div class="ficha-grid">
+    {% call field("Novo Nome") %}{{ alts.get('nome_empresarial', {}).get('novo','—') }}{% endcall %}
+  </div>
+  {% endif %}
+
+  {% if alts.get('capital_social', {}).get('ativo') %}
+  <div class="ficha-section" style="color:#065f46;">Alteração do Capital Social</div>
+  <div class="ficha-grid">
+    {% call field("Novo Capital") %}R$ {{ alts.get('capital_social', {}).get('novo','—') }}{% endcall %}
+    {% call field("Tipo") %}{{ alts.get('capital_social', {}).get('tipo','—') | replace('_',' ') | title }}{% endcall %}
+  </div>
+  {% endif %}
+
+  {% set ingressos = alts.get('ingresso_socios', []) %}
+  {% if ingressos %}
+  <div class="ficha-section" style="color:#065f46;">Ingresso de Sócios ({{ ingressos|length }})</div>
+  {% for s in ingressos %}
+  <div class="ficha-socio-block">
+    <div class="ficha-socio-header">
+      <span class="ficha-socio-name">{{ s.get('nome','—') }}</span>
+      {% if s.get('administrador') %}<span class="ficha-badge ficha-badge-primary">Administrador</span>{% endif %}
+    </div>
+    <div class="ficha-grid ficha-grid-3">
+      {% call field("CPF") %}{{ s.get('cpf','—') }}{% endcall %}
+      {% call field("Data de Nasc.") %}{{ s.get('dataNascimento','—') }}{% endcall %}
+      {% call field("Gênero") %}{{ s.get('genero','—') | title }}{% endcall %}
+      {% call field("Nacionalidade") %}{{ s.get('nacionalidade','—') | title }}{% endcall %}
+      {% call field("Estado Civil") %}{{ s.get('estadoCivil','—') | title }}
+        {% if s.get('uniaoEstavel') %} · União Estável{% if s.get('nomeCompanheiro') %} com {{ s.get('nomeCompanheiro') }}{% endif %}{% endif %}
+      {% endcall %}
+      {% call field("Profissão") %}{{ s.get('profissao','—') }}{% endcall %}
+      {% call field("Cotas") %}{{ s.get('quantidadeCotas','—') }} × R$ {{ s.get('valorUnitarioCota','1') }}{% endcall %}
+      {% set doc = s.get('documentoIdentificacao', {}) %}
+      {% call field("Doc. Identificação") %}{{ doc.get('tipo','') | upper }} {{ doc.get('numero','') }}{% if doc.get('orgaoExpedidor') %} / {{ doc.get('orgaoExpedidor') }}{% endif %}{% endcall %}
+    </div>
+    {% set end_s = s.get('endereco', {}) %}
+    {% if end_s.get('logradouroDescricao') or end_s.get('cidade') %}
+    <div class="ficha-label mt-1">Endereço Residencial</div>
+    <div class="ficha-value" style="font-size:.85em;">
+      {{ end_s.get('logradouroTipo','') }} {{ end_s.get('logradouroDescricao','') }}{% if end_s.get('numero') %}, {{ end_s.get('numero') }}{% endif %}
+      · {{ end_s.get('bairro','') }} · {{ end_s.get('cidade','') }}/{{ end_s.get('estado','') }} · CEP {{ end_s.get('cep','') }}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% set retiradas = alts.get('retirada_socios', []) %}
+  {% if retiradas %}
+  <div class="ficha-section" style="color:#991b1b;">Retirada de Sócios ({{ retiradas|length }})</div>
+  {% for s in retiradas %}
+  <div class="ficha-socio-block" style="border-color:#fca5a5;">
+    <div class="ficha-socio-header">
+      <span class="ficha-socio-name">{{ s.get('nome','—') }}</span>
+      <span class="ficha-badge" style="background:#fef2f2;color:#b91c1c;">Saindo</span>
+    </div>
+    <div class="ficha-grid ficha-grid-3">
+      {% call field("CPF") %}{{ s.get('cpf','—') }}{% endcall %}
+      {% call field("Gênero") %}{{ s.get('genero','—') | title }}{% endcall %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% set transf = alts.get('transferencia_cotas', []) %}
+  {% if transf %}
+  <div class="ficha-section" style="color:#92400e;">Transferência de Cotas ({{ transf|length }})</div>
+  {% for t in transf %}
+  <div class="ficha-socio-block" style="border-color:#fcd34d;">
+    <div class="ficha-grid ficha-grid-3">
+      {% call field("Cedente") %}{{ t.get('cedente_nome','—') }}{% endcall %}
+      {% call field("Cessionário") %}{{ t.get('cessionario_nome','—') }}{% endcall %}
+      {% call field("Cotas") %}{{ t.get('cotas','—') }}{% endcall %}
+      {% call field("Valor Unit.") %}R$ {{ t.get('valor','—') }}{% endcall %}
+      {% call field("Total") %}R$ {{ t.get('total','—') }}{% endcall %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if alts.get('administracao', {}).get('ativo') %}
+  <div class="ficha-section" style="color:#065f46;">Alteração da Administração</div>
+  <div class="ficha-grid">
+    {% call field("Tipo de Administração") %}{{ alts.get('administracao', {}).get('tipoAdministracao','—') | replace('_',' ') | title }}{% endcall %}
+  </div>
+  {% endif %}
+
+  {% set outras = alts.get('outras_clausulas', []) %}
+  {% if outras %}
+  <div class="ficha-section">Outras Cláusulas</div>
+  {% for cl in outras %}
+  <div class="ficha-field-full">
+    <div class="ficha-label">{{ cl.get('titulo','Cláusula') }}</div>
+    <div class="ficha-value-long">{{ cl.get('corpo','') }}</div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+{% endif %}
+{% endif %}
+{% endmacro %}
+
+{% macro field(label) %}<div class="ficha-field"><div class="ficha-label">{{ label }}</div><div class="ficha-value">{{ caller() }}</div></div>{% endmacro %}

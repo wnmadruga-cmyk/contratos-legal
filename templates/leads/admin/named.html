@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Admin — {{ label }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/leads/leads.css">
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h4 class="mb-0 fw-bold"><i class="bi bi-gear"></i> Configurações do CRM</h4>
+    <small class="text-muted">Gerenciando {{ label }}s</small>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newItemModal">
+    <i class="bi bi-plus-circle"></i> Adicionar
+  </button>
+</div>
+
+{% include "leads/admin/_admin_tabs.html" %}
+
+<div class="card">
+  <ul class="list-group list-group-flush">
+    {% for it in items %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-2">
+        <span class="lead-color-dot" style="background:{{ it.color }}"></span>
+        <strong>{{ it.name }}</strong>
+        <code class="small text-muted">{{ it.color }}</code>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary edit-btn" data-id="{{ it.id }}" data-name="{{ it.name }}"
+          data-color="{{ it.color }}" data-bs-toggle="modal" data-bs-target="#newItemModal">
+          <i class="bi bi-pencil"></i>
+        </button>
+        <form method="post" action="/admin/leads/{{ slug }}/{{ it.id }}/excluir" class="m-0"
+          onsubmit="return confirm('Excluir {{ it.name }}?')">
+          <button class="btn btn-sm btn-link text-danger"><i class="bi bi-trash"></i></button>
+        </form>
+      </div>
+    </li>
+    {% else %}
+    <li class="list-group-item text-muted text-center py-5">Nenhum cadastro ainda.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="newItemModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" method="post" action="/admin/leads/{{ slug }}/salvar">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalTitle">Nova {{ label|lower }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="id" id="itemId">
+        <div class="mb-2"><label class="form-label">Nome</label>
+          <input type="text" name="name" id="itemName" class="form-control" required>
+        </div>
+        <div class="mb-2"><label class="form-label">Cor</label>
+          <input type="color" name="color" id="itemColor" class="form-control form-control-color" value="#3b82f6">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const modal = document.getElementById('newItemModal');
+  modal.addEventListener('show.bs.modal', (e) => {
+    const btn = e.relatedTarget;
+    const isEdit = btn?.classList.contains('edit-btn');
+    document.getElementById('modalTitle').textContent = isEdit ? 'Editar {{ label|lower }}' : 'Nova {{ label|lower }}';
+    document.getElementById('itemId').value = isEdit ? btn.dataset.id : '';
+    document.getElementById('itemName').value = isEdit ? btn.dataset.name : '';
+    document.getElementById('itemColor').value = isEdit ? btn.dataset.color : '#3b82f6';
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,61 @@
+{# Modal "Novo Lead" — chamado por data-bs-target="#newLeadModal" #}
+<div class="modal fade" id="newLeadModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" method="post" action="/leads/novo">
+      <input type="hidden" name="return_url" value="{{ organ_code and ('/leads/organ/' ~ organ_code) or '' }}">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Novo Processo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Nome do cliente / empresa <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" required autofocus>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label">Tipo <span class="text-danger">*</span></label>
+            <select name="lead_type_id" class="form-select" required>
+              {% for t in types %}
+              <option value="{{ t.id }}" {% if (organ_type and organ_type.id == t.id) or (not organ_type and filters.type == t.id) %}selected{% endif %}>{{ t.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Responsável</label>
+            <select name="responsible_name" class="form-select">
+              <option value="">— selecione —</option>
+              {% for u in users %}
+              <option value="{{ u.name }}">{{ u.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Prioridade</label>
+            <select name="priority" class="form-select">
+              {% for p in priorities %}
+              <option value="{{ p.name }}" {% if p.name == 'Normal' %}selected{% endif %}>{{ p.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Status</label>
+            <select name="status" class="form-select">
+              {% for s in statuses %}
+              <option value="{{ s.name }}">{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Descrição</label>
+            <textarea name="description" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Criar lead</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,487 @@
+/* =========================================================================
+   Leads / CRM — estilo isolado.  Carregado por list.html, kanban.html, etc.
+   Convive com Bootstrap 5 do projeto principal sem conflitos.
+   ========================================================================= */
+
+:root {
+  --lead-prio-baixa: #94a3b8;
+  --lead-prio-normal: #3b82f6;
+  --lead-prio-alta: #f59e0b;
+  --lead-prio-urgente: #ef4444;
+}
+
+/* ---------- Cards (Kanban + lista) ---------- */
+
+.lead-prio-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lead-prio-normal);
+  flex-shrink: 0;
+}
+
+.lead-prio-dot[data-prio="Baixa"] {
+  background: var(--lead-prio-baixa);
+}
+
+.lead-prio-dot[data-prio="Normal"] {
+  background: var(--lead-prio-normal);
+}
+
+.lead-prio-dot[data-prio="Alta"] {
+  background: var(--lead-prio-alta);
+}
+
+.lead-prio-dot[data-prio="Urgente"] {
+  background: var(--lead-prio-urgente);
+}
+
+.lead-color-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+.lead-tag {
+  font-size: .7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.lead-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2456a4;
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 600;
+}
+
+.leads-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* ---------- Kanban ---------- */
+
+.kanban-scroll {
+  overflow-x: auto;
+  padding-bottom: 1rem;
+  margin: 0 -1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.kanban-board {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  align-items: stretch;
+  min-height: 500px;
+}
+
+.kanban-macro {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.kanban-macro-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 0 0.25rem 0;
+}
+
+.kanban-macro-title {
+  font-weight: 700;
+  color: #64748b;
+  font-size: .8rem;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.kanban-cols {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.kanban-col {
+  width: 280px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+
+.kanban-col-header {
+  padding: .65rem .75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.kanban-col-body {
+  padding: .5rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 80px;
+}
+
+.kanban-col-body.dragging-over {
+  background: #eff6ff;
+}
+
+.kanban-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-left: 4px solid var(--lead-prio-normal);
+  border-radius: 8px;
+  padding: .65rem .75rem;
+  margin-bottom: .5rem;
+  cursor: grab;
+  transition: box-shadow .2s, transform .2s, border-color .2s;
+}
+
+.kanban-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .08);
+  transform: translateY(-1px);
+}
+
+.kanban-card[data-priority="Baixa"] {
+  border-left-color: var(--lead-prio-baixa);
+}
+
+.kanban-card[data-priority="Normal"] {
+  border-left-color: var(--lead-prio-normal);
+}
+
+.kanban-card[data-priority="Alta"] {
+  border-left-color: var(--lead-prio-alta);
+}
+
+.kanban-card[data-priority="Urgente"] {
+  border-left-color: var(--lead-prio-urgente);
+}
+
+.kanban-card.sortable-ghost {
+  opacity: .35;
+}
+
+.kanban-card.sortable-drag {
+  cursor: grabbing;
+}
+
+.kanban-card-head {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.kanban-card-title {
+  font-weight: 600;
+  font-size: .9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Card modal (genie animation) ---------- */
+
+.card-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .55);
+  backdrop-filter: blur(2px);
+  z-index: 1080;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+
+.card-modal-backdrop.visible {
+  opacity: 1;
+}
+
+.card-modal {
+  background: #fff;
+  color: #1e293b;
+  border: none;
+  width: min(1000px, 96vw);
+  max-height: 92vh;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .30);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(.88) translateY(32px);
+  opacity: 0;
+  transform-origin: bottom center;
+  transition:
+    transform .28s cubic-bezier(.4, 0, .2, 1),
+    opacity .22s ease;
+}
+
+.card-modal-backdrop.visible .card-modal {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  transition:
+    transform .38s cubic-bezier(.34, 1.3, .64, 1),
+    opacity .22s ease;
+}
+
+.card-modal-header {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: 1.25rem 1.5rem 0.5rem;
+  border-bottom: none;
+}
+
+.card-modal-meta {
+  padding: .75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  background: transparent;
+  border-bottom: none;
+}
+
+.card-modal-content {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.card-modal .nav-tabs .nav-link {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #64748b;
+  font-weight: 600;
+  padding: .75rem 1.25rem;
+}
+
+.card-modal .nav-tabs .nav-link.active {
+  color: #1e293b;
+  border-bottom-color: #1e293b;
+  background: transparent;
+}
+
+.card-modal .nav-tabs {
+  border-bottom: 1px solid #e2e8f0;
+  padding-top: .5rem;
+  margin: 0 1.5rem;
+}
+
+/* ---------- Stage picker (barra de progresso clicável) ---------- */
+
+.stage-picker {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #f1f5f9;
+  border-radius: 999px;
+}
+
+.stage-picker .stage-pill {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: .75rem;
+  text-align: center;
+  border-radius: 999px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background .15s, color .15s;
+}
+
+.stage-picker .stage-pill:hover {
+  background: #e2e8f0;
+}
+
+.stage-picker .stage-pill.done {
+  background: #cbd5e1;
+  color: #1e293b;
+}
+
+.stage-picker .stage-pill.current {
+  background: #2456a4;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ---------- Histórico (timeline) ---------- */
+
+.timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-left: 2px solid #e2e8f0;
+}
+
+.timeline>li {
+  padding: .5rem 0 .5rem 1rem;
+  margin-left: .25rem;
+  position: relative;
+}
+
+.timeline>li::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: .9rem;
+  width: 12px;
+  height: 12px;
+  background: #2456a4;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+
+/* ---------- Comentário ---------- */
+
+.comment-item {
+  padding: .75rem 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: .75rem;
+  font-size: .95rem;
+  color: inherit;
+}
+
+/* ---------- Form dinâmico ---------- */
+
+.dynamic-form .field-block {
+  margin-bottom: 1rem;
+}
+
+.dynamic-form .field-section {
+  font-size: .75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin: 1.5rem 0 .5rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: .25rem;
+}
+
+.dynamic-form .repeater-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: .75rem;
+  margin-bottom: .5rem;
+  background: #fafbff;
+  position: relative;
+}
+
+.dynamic-form .repeater-item .remove-item {
+  position: absolute;
+  top: .5rem;
+  right: .5rem;
+}
+
+.dynamic-form .autocomplete-wrap {
+  position: relative;
+}
+
+.dynamic-form .autocomplete-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1090;
+  display: none;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .08);
+}
+
+.dynamic-form .autocomplete-list.open {
+  display: block;
+}
+
+.dynamic-form .autocomplete-list .item {
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: .85rem;
+}
+
+.dynamic-form .autocomplete-list .item:hover,
+.dynamic-form .autocomplete-list .item.active {
+  background: #eff6ff;
+}
+
+/* ---------- Form editor (admin) ---------- */
+
+.field-row {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: .65rem;
+  margin-bottom: .5rem;
+  background: #fafbff;
+}
+
+.field-row .grip {
+  cursor: grab;
+  color: #94a3b8;
+}
+
+.field-row.is-repeater {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+/* ---------- SLA card colors ---------- */
+
+.kanban-card-overdue {
+  border-left: 3px solid #ef4444 !important;
+  background: #fff8f8;
+}
+
+.kanban-card-due-today {
+  border-left: 3px solid #f59e0b !important;
+  background: #fffbf0;
+}
+
+/* ---------- Checklist required-item alert ---------- */
+.chk-required-alert {
+  background: #fff1f2 !important;
+  border-left: 3px solid #ef4444;
+  border-radius: 4px;
+  animation: chk-shake 0.3s ease;
+}
+@keyframes chk-shake {
+  0%,100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+
+/* ---------- Mention autocomplete ---------- */
+
+.mention-highlight {
+  color: #2456a4;
+  font-weight: 600;
+}

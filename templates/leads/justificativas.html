@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Justificativas — ECM Registro{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="mb-0 fw-bold">Justificativas e Guardas</h4>
+    <small class="text-muted">Registro de movimentações com justificativa e eventos de guarda</small>
+  </div>
+  <div class="d-flex gap-2">
+    <select class="form-select form-select-sm" id="filterType" style="width:220px;">
+      <option value="">Todos os tipos</option>
+      <option value="backward_client_approval">Retrocesso — Aprovação Cliente</option>
+      <option value="backward_internal_review">Retrocesso — Conferência Interna</option>
+      <option value="backward_signature">Retrocesso — Assinatura</option>
+      <option value="backward_junta">Retrocesso — Junta Comercial</option>
+      <option value="client_approved">Aprovado pelo Cliente</option>
+      <option value="client_rejected">Reprovado pelo Cliente</option>
+    </select>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="eventsTable">
+        <thead class="table-light">
+          <tr>
+            <th>Processo</th>
+            <th>Tipo de Evento</th>
+            <th>Etapa Origem</th>
+            <th>Etapa Destino</th>
+            <th>Ator</th>
+            <th>Justificativa</th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ev in events %}
+          <tr data-event-type="{{ ev.event_type }}">
+            <td class="fw-semibold">
+              <a href="/leads?card={{ ev.lead_id }}" class="text-dark text-decoration-none">
+                {{ ev.lead_name or ev.lead_id[:8] }}
+              </a>
+            </td>
+            <td>
+              {% set et = ev.event_type %}
+              {% if et == 'backward_client_approval' %}
+                <span class="badge bg-warning text-dark">Retrocesso — Aprovação Cliente</span>
+              {% elif et == 'backward_internal_review' %}
+                <span class="badge bg-warning text-dark">Retrocesso — Conferência Interna</span>
+              {% elif et == 'backward_signature' %}
+                <span class="badge bg-warning text-dark">Retrocesso — Assinatura</span>
+              {% elif et == 'backward_junta' %}
+                <span class="badge bg-warning text-dark">Retrocesso — Junta</span>
+              {% elif et == 'client_approved' %}
+                <span class="badge bg-success">Aprovado pelo Cliente</span>
+              {% elif et == 'client_rejected' %}
+                <span class="badge bg-danger">Reprovado pelo Cliente</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ et }}</span>
+              {% endif %}
+            </td>
+            <td class="small text-muted">{{ ev.stage_from_name or ev.stage_from or '—' }}</td>
+            <td class="small text-muted">{{ ev.stage_to_name or ev.stage_to or '—' }}</td>
+            <td class="small">{{ ev.actor_name or '—' }}</td>
+            <td class="small" style="max-width:260px;">
+              {% if ev.justification %}
+              <span title="{{ ev.justification }}">{{ ev.justification[:80] }}{% if ev.justification|length > 80 %}…{% endif %}</span>
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="small text-muted" style="white-space:nowrap;">
+              {{ ev.created_at[:16]|replace('T', ' ') if ev.created_at else '—' }}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-5">
+              <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+              Nenhum evento registrado ainda.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const filterSel = document.getElementById('filterType');
+  if (filterSel) {
+    filterSel.addEventListener('change', () => {
+      const val = filterSel.value;
+      document.querySelectorAll('#eventsTable tbody tr[data-event-type]').forEach(row => {
+        row.style.display = (!val || row.dataset.eventType === val) ? '' : 'none';
+      });
+    });
+  }
+</script>
+{% endblock %}

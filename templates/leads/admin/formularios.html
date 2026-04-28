@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Admin — Formulários{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/leads/leads.css">
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h4 class="mb-0 fw-bold"><i class="bi bi-gear"></i> Configurações do CRM</h4>
+    <small class="text-muted">Monte os campos para cada serviço</small>
+  </div>
+</div>
+
+{% include "leads/admin/_admin_tabs.html" %}
+
+<div class="row g-3">
+  <div class="col-md-3">
+    <div class="list-group">
+      {% for t in types %}
+      <a href="?id={{ t.id }}" class="list-group-item list-group-item-action
+                {% if selected_id == t.id %}active{% endif %}">
+        <span class="lead-color-dot" style="background:{{ t.color }}"></span> {{ t.name }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="col-md-9">
+    <form method="post" action="/admin/leads/formularios/salvar">
+      <input type="hidden" name="type_id" value="{{ selected_id }}">
+      <input type="hidden" name="fields_json" id="fieldsJson">
+
+      <div class="card">
+        <div class="card-header d-flex justify-content-between">
+          <span>Campos</span>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal"
+              data-bs-target="#copyFormModal">
+              <i class="bi bi-files"></i> Copiar de...
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="addFieldBtn">
+              <i class="bi bi-plus"></i> Adicionar campo
+            </button>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-save"></i> Salvar</button>
+          </div>
+        </div>
+        <div id="fieldsHost" class="p-3"></div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Copiar Formulário -->
+<div class="modal fade" id="copyFormModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" method="post" action="/admin/leads/formularios/copiar">
+      <div class="modal-header">
+        <h5 class="modal-title">Copiar Formulário</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">Isso apagará o formulário atual do serviço e copiará os campos de outro. Deseja
+          continuar?</p>
+        <input type="hidden" name="target_type_id" value="{{ selected_id }}">
+        <div class="mb-2">
+          <label class="form-label">Copiar de qual serviço?</label>
+          <select class="form-select" name="source_type_id" required>
+            <option value="">Selecione...</option>
+            {% for t in types %}
+            {% if t.id != selected_id %}
+            <option value="{{ t.id }}">{{ t.name }}</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary"><i class="bi bi-files"></i> Copiar e Sobrescrever</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  window.LEADS_INITIAL_FIELDS = {{ fields | tojson }};
+</script>
+<script src="/static/leads/form-editor.js"></script>
+{% endblock %}

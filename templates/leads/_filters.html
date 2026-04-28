@@ -1,0 +1,51 @@
+{# Barra de filtros — usada por list.html e kanban.html #}
+<form class="card card-body mb-3 py-2" method="get" action="{{ '/leads/organ/' ~ organ_code if organ_code else '/leads' }}">
+  <input type="hidden" name="view" value="{{ request.args.get('view','list') }}">
+  <div class="row g-2 align-items-center small">
+    <div class="col-md-3">
+      <label class="form-label mb-0 text-muted">Tipo</label>
+      <select name="type" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">— todos —</option>
+        {% for t in types %}
+        <option value="{{ t.id }}" {% if filters.type==t.id or (not filters.type and selected_type==t.id) %}selected{%
+          endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label mb-0 text-muted">Prioridade</label>
+      <select name="priority" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">— todas —</option>
+        {% for p in priorities %}
+        <option value="{{ p.name }}" {% if filters.priority==p.name %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label mb-0 text-muted">Status</label>
+      <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">— todos —</option>
+        {% for s in statuses %}
+        <option value="{{ s.name }}" {% if filters.status==s.name %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label mb-0 text-muted">Tag</label>
+      <select name="tag" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">— todas —</option>
+        {% for t in tags %}
+        <option value="{{ t.id }}" {% if filters.tag==t.id %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label mb-0 text-muted">Responsável</label>
+      <input type="text" class="form-control form-control-sm" name="responsible" value="{{ filters.responsible or '' }}"
+        placeholder="Nome…">
+    </div>
+    <div class="col-md-1 d-flex align-items-end">
+      <button type="submit" class="btn btn-sm btn-outline-secondary w-100"><i class="bi bi-search"></i></button>
+    </div>
+  </div>
+</form>

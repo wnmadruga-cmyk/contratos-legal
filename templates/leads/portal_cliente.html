@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="refresh" content="300">
+  <title>{{ portal.lead.name }} | ECM Registro</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root { --brand:#2456a4; --success:#10b981; --warn:#f59e0b; --danger:#ef4444; --gray:#64748b; }
+    * { box-sizing:border-box; }
+    body { background:#f8fafc; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; margin:0; padding:0; }
+
+    /* Header */
+    .portal-header {
+      background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 55%,#2456a4 100%);
+      color:#fff; padding:2rem 1.5rem 3.5rem; text-align:center;
+    }
+    .portal-header .badge-tipo { display:inline-block; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); border-radius:20px; padding:.3rem .9rem; font-size:.75rem; letter-spacing:.5px; margin-bottom:.75rem; }
+    .portal-header h1 { font-size:1.5rem; font-weight:700; margin:0 0 .4rem; }
+    .portal-header .sub { font-size:.88rem; opacity:.75; }
+    .live-dot { display:inline-block; width:8px; height:8px; background:#4ade80; border-radius:50%; animation:pulse 2s infinite; margin-right:5px; vertical-align:middle; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+
+    .portal-main { max-width:720px; margin:-2rem auto 2rem; padding:0 1rem; }
+
+    /* Welcome */
+    .welcome-card { background:#fff; border-radius:16px; padding:1.25rem 1.5rem; box-shadow:0 4px 20px rgba(0,0,0,.07); margin-bottom:1.25rem; border-left:4px solid var(--brand); }
+    .welcome-card p { margin:0; font-size:.88rem; line-height:1.65; color:#475569; }
+
+    /* MILESTONE CARDS */
+    .milestone-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:.75rem; margin-bottom:1.25rem; }
+    @media(max-width:580px){ .milestone-grid { grid-template-columns:1fr; } }
+
+    .milestone { border-radius:16px; padding:1.1rem 1rem; text-align:center; position:relative; overflow:hidden; }
+    .milestone.cnpj  { background:linear-gradient(135deg,#1d4ed8,#2456a4); color:#fff; }
+    .milestone.nf    { background:linear-gradient(135deg,#047857,#10b981); color:#fff; }
+    .milestone.total { background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
+    .milestone .ms-icon { font-size:1.8rem; margin-bottom:.4rem; }
+    .milestone .ms-days { font-size:2rem; font-weight:800; line-height:1; }
+    .milestone .ms-label { font-size:.72rem; opacity:.85; margin-top:.2rem; letter-spacing:.3px; }
+    .milestone .ms-msg  { font-size:.78rem; margin-top:.35rem; font-weight:600; }
+    .milestone .ms-date { font-size:.7rem; opacity:.7; margin-top:.15rem; }
+    .milestone.done-m  { background:linear-gradient(135deg,#065f46,#10b981); color:#fff; }
+    .milestone.late-m  { background:linear-gradient(135deg,#991b1b,#ef4444); color:#fff; }
+
+    /* Stepper */
+    .stepper-card { background:#fff; border-radius:16px; padding:1.5rem; box-shadow:0 4px 20px rgba(0,0,0,.07); margin-bottom:1.25rem; }
+    .stepper-card h6 { font-size:.72rem; text-transform:uppercase; letter-spacing:.7px; color:var(--gray); font-weight:700; margin-bottom:1.25rem; }
+    .phases-wrapper { display:flex; flex-direction:column; gap:0; }
+    .phase-item { display:flex; gap:.9rem; align-items:flex-start; padding-bottom:1.3rem; position:relative; }
+    .phase-item:last-child { padding-bottom:0; }
+    .phase-item:last-child .phase-line { display:none; }
+    .phase-icon-wrap { flex-shrink:0; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1rem; position:relative; z-index:1; }
+    .phase-icon-wrap.done   { background:var(--success); color:#fff; }
+    .phase-icon-wrap.active { background:var(--brand); color:#fff; box-shadow:0 0 0 4px rgba(36,86,164,.2); }
+    .phase-icon-wrap.pending{ background:#e2e8f0; color:#94a3b8; }
+    .phase-line { position:absolute; left:19px; top:40px; bottom:0; width:2px; background:#e2e8f0; }
+    .phase-item.done .phase-line  { background:var(--success); }
+    .phase-body { flex:1; padding-top:.35rem; }
+    .phase-body .phase-name { font-weight:600; font-size:.9rem; color:#1e293b; }
+    .phase-item.pending .phase-body .phase-name { color:#94a3b8; }
+    .phase-body .phase-desc { font-size:.76rem; color:var(--gray); }
+    .phase-badge { display:inline-flex; align-items:center; gap:4px; font-size:.7rem; padding:.2em .55em; border-radius:20px; font-weight:600; margin-top:.3rem; }
+    .phase-badge.done-b   { background:#d1fae5; color:#065f46; }
+    .phase-badge.active-b { background:#dbeafe; color:#1d4ed8; }
+    .phase-badge.over-b   { background:#fef2f2; color:#b91c1c; }
+    .phase-badge.pend-b   { background:#f1f5f9; color:#64748b; }
+
+    /* Milestone marker dentro do stepper */
+    .milestone-marker { display:flex; gap:.9rem; align-items:center; padding:0 0 1.3rem 0; }
+    .milestone-marker .mm-dot { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+    .milestone-marker.cnpj-marker .mm-dot  { background:#dbeafe; color:#1d4ed8; border:2px dashed #2456a4; }
+    .milestone-marker.nf-marker   .mm-dot  { background:#d1fae5; color:#065f46; border:2px dashed #10b981; }
+    .milestone-marker .mm-body    { font-size:.8rem; }
+    .milestone-marker .mm-title   { font-weight:700; }
+    .milestone-marker .mm-sub     { color:var(--gray); font-size:.72rem; }
+
+    /* Client banner */
+    .client-banner { background:linear-gradient(135deg,#fffbeb,#fef3c7); border:1px solid #fcd34d; border-radius:14px; padding:1.1rem 1.25rem; margin-bottom:1.25rem; display:flex; gap:.9rem; align-items:flex-start; }
+    .client-banner .cb-icon { font-size:1.6rem; color:#d97706; flex-shrink:0; }
+    .client-banner .cb-title { font-weight:700; color:#92400e; margin-bottom:.2rem; font-size:.9rem; }
+    .client-banner .cb-text { font-size:.82rem; color:#78350f; }
+
+    /* Progress bar */
+    .prog-bar-outer { height:10px; background:#e2e8f0; border-radius:5px; overflow:hidden; margin:.35rem 0; }
+    .prog-bar-inner { height:100%; border-radius:5px; }
+
+    /* Footer */
+    .portal-footer { text-align:center; padding:1.5rem 1rem; color:#94a3b8; font-size:.72rem; }
+    .portal-footer strong { color:#64748b; }
+  </style>
+</head>
+<body>
+
+{% set lead = portal.lead %}
+{% set phases = portal.phases %}
+{% set is_done = lead.status == 'Concluído' %}
+{% set is_delayed = portal.is_delayed %}
+{% set total_stages = portal.total_stages | default(18) %}
+{% set cur_pos = lead.stage_position or 0 %}
+{% set progress_pct = ([[(cur_pos / (total_stages - 1) * 100)|round(0)|int, 2]|max, 100]|min) if total_stages > 1 else 0 %}
+
+{# Compute days until each milestone #}
+{% set today_str = today.isoformat() if today is defined else '' %}
+
+<!-- Header -->
+<div class="portal-header">
+  <div class="badge-tipo"><i class="bi bi-building me-1"></i>{{ lead.type_name or 'Processo' }}</div>
+  <h1>{{ lead.name }}</h1>
+  <div class="sub">
+    <span class="live-dot"></span>Atualizado em tempo real
+    &nbsp;·&nbsp;
+    {% if is_done %}<span style="color:#4ade80;font-weight:600;">Processo Concluído ✓</span>
+    {% elif is_delayed %}<span style="color:#fca5a5;font-weight:600;">Prazo em atraso</span>
+    {% else %}<span style="color:#a7f3d0;font-weight:600;">Em andamento</span>{% endif %}
+  </div>
+</div>
+
+<div class="portal-main">
+
+  <!-- Welcome -->
+  <div class="welcome-card">
+    <p>
+      <strong>Olá! Bem-vindo(a) ao acompanhamento do seu processo.</strong><br><br>
+      Aqui você acompanha em tempo real o andamento da abertura ou alteração da sua empresa.
+      Os marcos abaixo mostram as datas mais importantes: <strong>quando seu CNPJ estará pronto</strong>
+      e quando a nota fiscal estará liberada. Qualquer dúvida, fale com nosso time!
+    </p>
+  </div>
+
+  <!-- MILESTONE CARDS: CNPJ / NF / Total -->
+  {% if not is_done %}
+  <div class="milestone-grid">
+
+    {# CNPJ milestone #}
+    {% if portal.due_date_junta %}
+      {% set d_cnpj = (portal.due_date_junta | string)[:10] %}
+      {# compute days in template via a simple hack — we'll do it in JS too #}
+      <div class="milestone cnpj" id="ms-cnpj" data-due="{{ d_cnpj }}">
+        <div class="ms-icon"><i class="bi bi-building" style="font-size:1.7rem;"></i></div>
+        <div class="ms-days" id="ms-cnpj-days">—</div>
+        <div class="ms-label">DIAS PARA SEU CNPJ</div>
+        <div class="ms-msg" id="ms-cnpj-msg">Calculando…</div>
+        <div class="ms-date">Previsão: {{ d_cnpj }}</div>
+      </div>
+    {% endif %}
+
+    {# Nota Fiscal milestone #}
+    {% if portal.due_date_nf %}
+      {% set d_nf = (portal.due_date_nf | string)[:10] %}
+      <div class="milestone nf" id="ms-nf" data-due="{{ d_nf }}">
+        <div class="ms-icon"><i class="bi bi-receipt" style="font-size:1.7rem;"></i></div>
+        <div class="ms-days" id="ms-nf-days">—</div>
+        <div class="ms-label">DIAS PARA NOTA FISCAL</div>
+        <div class="ms-msg" id="ms-nf-msg">Calculando…</div>
+        <div class="ms-date">Previsão: {{ d_nf }}</div>
+      </div>
+    {% endif %}
+
+    {# Total #}
+    {% if portal.due_date %}
+      {% set d_total = (portal.due_date | string)[:10] %}
+      <div class="milestone total" id="ms-total" data-due="{{ d_total }}">
+        <div class="ms-icon"><i class="bi bi-shield-check" style="font-size:1.7rem;color:#64748b;"></i></div>
+        <div class="ms-days" id="ms-total-days">—</div>
+        <div class="ms-label">DIAS PARA O ALVARÁ</div>
+        <div class="ms-msg" id="ms-total-msg">Calculando…</div>
+        <div class="ms-date">Previsão: {{ d_total }}</div>
+      </div>
+    {% endif %}
+
+  </div>
+  {% else %}
+  <div class="milestone done-m mb-3 text-center" style="border-radius:16px;padding:1.25rem;">
+    <div style="font-size:2rem;"><i class="bi bi-patch-check-fill" style="color:#fff;"></i></div>
+    <div style="font-weight:700;font-size:1.1rem;">Processo Concluído</div>
+    <div style="font-size:.85rem;opacity:.85;margin-top:.35rem;">Todos os documentos e registros foram finalizados com sucesso.</div>
+  </div>
+  {% endif %}
+
+  <!-- Assinatura Junta Comercial banner (quando link disponível) -->
+  {% if lead.op_link_assinatura_junta %}
+  <div style="background:linear-gradient(135deg,#78350f,#d97706);border-radius:14px;padding:1.25rem 1.5rem;margin-bottom:1rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;box-shadow:0 4px 16px rgba(217,119,6,.35);">
+    <div style="font-size:2rem;flex-shrink:0;">✍️</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:700;color:#fff;font-size:.95rem;margin-bottom:.3rem;">Assinatura Digital Disponível</div>
+      <div style="font-size:.82rem;color:rgba(255,255,255,.85);margin-bottom:.75rem;">
+        O documento está pronto para assinatura na Junta Comercial. Clique no botão abaixo para assinar digitalmente.
+      </div>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">
+        <a href="{{ lead.op_link_assinatura_junta }}" target="_blank" rel="noopener"
+          style="display:inline-flex;align-items:center;gap:.5rem;background:#fff;color:#92400e;font-weight:700;font-size:.88rem;padding:.55rem 1.25rem;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.15);">
+          <i class="bi bi-pen-fill"></i>Acessar Link de Assinatura
+        </a>
+        {% if state_manual %}
+        <a href="/api/leads/manuais-estado/{{ state_manual.state_code }}" target="_blank" rel="noopener"
+          style="display:inline-flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.18);color:#fff;font-weight:600;font-size:.85rem;padding:.55rem 1.1rem;border-radius:8px;text-decoration:none;border:1px solid rgba(255,255,255,.4);">
+          <i class="bi bi-file-earmark-text-fill"></i>Manual de Assinatura ({{ state_manual.state_code }})
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% if state_manual %}
+  <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:12px;padding:.85rem 1.1rem;margin-bottom:1.25rem;font-size:.82rem;color:#78350f;">
+    <i class="bi bi-info-circle me-2 text-warning"></i>
+    <strong>Atenção:</strong> Antes de assinar, leia o <a href="/api/leads/manuais-estado/{{ state_manual.state_code }}" target="_blank" style="color:#92400e;font-weight:700;">Manual de Assinatura do {{ state_manual.state_code }}</a> para seguir corretamente o procedimento da Junta Comercial do seu estado.
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <!-- Client waiting banner -->
+  {% if portal.cur_in_client_stage and not is_done %}
+  <div class="client-banner">
+    <div class="cb-icon"><i class="bi bi-person-exclamation"></i></div>
+    <div>
+      <div class="cb-title">Aguardando a sua ação!</div>
+      <div class="cb-text">
+        O seu processo está na etapa <strong>"{{ portal.cur_stage_name }}"</strong>
+        e aguarda sua participação há <strong>{{ portal.days_in_phase }} dia(s)</strong>.
+        {% if portal.days_in_phase > 5 %}Por favor, entre em contato com nosso escritório o quanto antes.
+        {% else %}Assim que recebermos seu retorno, continuamos imediatamente!{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Progress + Stepper -->
+  <div class="stepper-card">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="mb-0">Progresso geral</h6>
+      <span style="font-size:.75rem;color:var(--gray);">{{ progress_pct }}% concluído</span>
+    </div>
+    <div class="prog-bar-outer mb-3">
+      <div class="prog-bar-inner {% if is_done %}bg-success{% elif is_delayed %}bg-danger{% else %}bg-primary{% endif %}"
+           style="width:{{ progress_pct }}%"></div>
+    </div>
+
+    <h6>Macrofases do processo</h6>
+    <div class="phases-wrapper">
+      {% for ph in phases %}
+      <div class="phase-item {{ ph.status }}">
+        <div class="phase-line"></div>
+        <div class="phase-icon-wrap {{ ph.status }}">
+          {% if ph.status == 'done' %}<i class="bi bi-check-lg"></i>
+          {% else %}<i class="bi {{ ph.icon }}"></i>{% endif %}
+        </div>
+        <div class="phase-body">
+          <div class="phase-name">{{ ph.label }}</div>
+          <div class="phase-desc">{{ ph.desc }}</div>
+          <div class="d-flex flex-wrap gap-1 mt-1">
+            {% if ph.status == 'done' %}
+              <span class="phase-badge done-b"><i class="bi bi-check-circle-fill"></i>Concluída</span>
+            {% elif ph.status == 'active' %}
+              {% set over_sla = ph.days_in_phase and ph.sla_days and ph.days_in_phase > ph.sla_days %}
+              <span class="phase-badge {% if over_sla %}over-b{% else %}active-b{% endif %}">
+                <i class="bi bi-clock-fill"></i>{{ ph.days_in_phase }}d nesta fase
+              </span>
+              {% if ph.sla_days %}
+              <span class="phase-badge {% if over_sla %}over-b{% else %}done-b{% endif %}">
+                {% if over_sla %}<i class="bi bi-exclamation-triangle"></i>Prazo {{ ph.sla_days }}d ({{ ph.days_in_phase - ph.sla_days }}d excedido)
+                {% else %}<i class="bi bi-calendar-check"></i>Prazo: {{ ph.sla_days }}d{% endif %}
+              </span>
+              {% endif %}
+            {% else %}
+              <span class="phase-badge pend-b">{% if ph.sla_days %}<i class="bi bi-calendar3"></i>Estimativa: {{ ph.sla_days }}d{% else %}Aguardando{% endif %}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {# Insert CNPJ milestone marker after "Trâmite na Junta" (phase index 3) #}
+      {% if loop.index0 == 3 and portal.due_date_junta %}
+      <div class="milestone-marker cnpj-marker">
+        <div class="mm-dot"><i class="bi bi-building" style="font-size:.95rem;"></i></div>
+        <div class="mm-body">
+          <div class="mm-title" style="color:#1d4ed8;">Emissão do CNPJ</div>
+          <div class="mm-sub">Previsão: {{ portal.due_date_junta }} · Após o registro na Junta Comercial, o CNPJ é liberado pela Receita Federal.</div>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Insert NF milestone marker between "Cadastros" (index 4) and "Licenças e Alvarás" (index 5) #}
+      {% if loop.index0 == 4 and portal.due_date_nf %}
+      <div class="milestone-marker nf-marker">
+        <div class="mm-dot"><i class="bi bi-receipt" style="font-size:.95rem;"></i></div>
+        <div class="mm-body">
+          <div class="mm-title" style="color:#065f46;">Liberação da Nota Fiscal</div>
+          <div class="mm-sub">Previsão: {{ portal.due_date_nf }} · Após inscrições fiscais e pedido junto ao município.</div>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Footer note -->
+  {% if portal.total_client_days > 0 %}
+  <div style="background:#fff;border-radius:14px;padding:1rem 1.25rem;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:1.25rem;font-size:.82rem;color:#475569;">
+    <i class="bi bi-info-circle me-1 text-primary"></i>
+    Ao longo do processo, <strong>{{ portal.total_client_days }} dia(s)</strong> foram períodos de aguardo da sua participação (assinatura, aprovações ou pagamentos).
+    Uma resposta rápida da sua parte agiliza muito o andamento!
+  </div>
+  {% endif %}
+
+  <!-- Info box -->
+  <div style="background:#fff;border-radius:14px;padding:1rem 1.25rem;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:1.25rem;font-size:.82rem;color:#475569;">
+    <div style="font-weight:700;color:#334155;margin-bottom:.5rem;font-size:.85rem;">
+      <i class="bi bi-question-circle me-1 text-primary"></i>Informações do Processo
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem .75rem;">
+      <div><span style="color:#94a3b8;font-size:.75rem;">Tipo de serviço</span><br><strong>{{ lead.type_name or '—' }}</strong></div>
+      <div><span style="color:#94a3b8;font-size:.75rem;">Status atual</span><br><strong>{{ lead.status or '—' }}</strong></div>
+      <div><span style="color:#94a3b8;font-size:.75rem;">Etapa atual</span><br><strong>{{ lead.stage_name or '—' }}</strong></div>
+      <div><span style="color:#94a3b8;font-size:.75rem;">Responsável</span><br><strong>{{ lead.responsible_name or 'Equipe ECM' }}</strong></div>
+    </div>
+    <div style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid #f1f5f9;font-size:.76rem;color:#94a3b8;">
+      <i class="bi bi-lock me-1"></i>Este link é exclusivo para o acompanhamento do seu processo. Não compartilhe com terceiros.
+    </div>
+  </div>
+
+</div><!-- /portal-main -->
+
+<div class="portal-footer">
+  <strong>ECM Registro</strong> &nbsp;·&nbsp; Portal de Acompanhamento de Processos<br>
+  <span style="font-size:.67rem;">Software desenvolvido por ECM Atuações &nbsp;·&nbsp; Atualizado automaticamente a cada 5 minutos</span>
+</div>
+
+<script>
+// Compute days until milestones and update cards
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00').getTime();
+  return Math.ceil((d - Date.now()) / 86400000);
+}
+function updateMilestone(cardId, daysId, msgId, days, msgOk, msgLate, msgDone) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  const dEl = document.getElementById(daysId);
+  const mEl = document.getElementById(msgId);
+  if (days === null) return;
+  if (days < 0) {
+    const absDays = Math.abs(days);
+    if (dEl) dEl.textContent = absDays + 'd';
+    if (mEl) mEl.textContent = 'Prazo excedido há ' + absDays + ' dia(s)';
+    card.classList.add('late-m');
+    card.classList.remove('done-m');
+  } else if (days === 0) {
+    if (dEl) dEl.textContent = 'Hoje!';
+    if (mEl) mEl.textContent = 'Vence hoje!';
+  } else {
+    if (dEl) dEl.textContent = days;
+    if (mEl) mEl.textContent = msgOk.replace('{d}', days);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  {% if portal.due_date_junta %}
+  const dJunta = daysUntil('{{ portal.due_date_junta }}');
+  updateMilestone('ms-cnpj', 'ms-cnpj-days', 'ms-cnpj-msg', dJunta,
+    'Falta {d} dia(s) para o seu CNPJ ser emitido!', '', '');
+  {% endif %}
+
+  {% if portal.due_date_nf %}
+  const dNF = daysUntil('{{ portal.due_date_nf }}');
+  updateMilestone('ms-nf', 'ms-nf-days', 'ms-nf-msg', dNF,
+    'Nota fiscal disponível em {d} dia(s)', '', '');
+  {% endif %}
+
+  {% if portal.due_date %}
+  const dTotal = daysUntil('{{ portal.due_date }}');
+  updateMilestone('ms-total', 'ms-total-days', 'ms-total-msg', dTotal,
+    'Alvará previsto em {d} dia(s)', '', '');
+  {% endif %}
+});
+</script>
+</body>
+</html>

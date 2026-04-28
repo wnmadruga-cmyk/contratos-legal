@@ -242,7 +242,27 @@ def init_db():
             chave TEXT PRIMARY KEY,
             valor TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id            TEXT PRIMARY KEY,
+            name          TEXT NOT NULL,
+            email         TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            profile       TEXT NOT NULL DEFAULT 'operacional',
+            active        INTEGER NOT NULL DEFAULT 1,
+            created_at    TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        );
     """)
+    # Bootstrap: cria admin padrão se não existir nenhum usuário
+    import uuid as _uuid
+    from werkzeug.security import generate_password_hash as _gph
+    if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
+        conn.execute(
+            "INSERT INTO users (id, name, email, password_hash, profile) VALUES (?,?,?,?,?)",
+            (str(_uuid.uuid4()), "Administrador", "admin@contratos.com",
+             _gph("admin123", method="pbkdf2:sha256"), "admin")
+        )
+
     # Popula defaults na primeira execução
     for codigo, tipo, titulo, corpo in _CLAUSULAS_PADRAO:
         conn.execute(
@@ -440,3 +460,58 @@ def get_texto_alteracao(codigo: str) -> str:
     ).fetchone()
     conn.close()
     return row["corpo"] if row else ""
+
+
+# ---------------------------------------------------------------------------
+# Usuários
+# ---------------------------------------------------------------------------
+
+def get_user_by_email(email: str):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM users WHERE email=? AND active=1", (email,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_user_by_id(uid: str):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def list_users():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM users ORDER BY name").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def create_user(name, email, password_hash, profile="operacional"):
+    import uuid
+    uid = str(uuid.uuid4())
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO users (id, name, email, password_hash, profile) VALUES (?,?,?,?,?)",
+        (uid, name, email, password_hash, profile)
+    )
+    conn.commit()
+    conn.close()
+    return uid
+
+
+def update_user(uid, name, email, profile, active):
+    conn = get_db()
+    conn.execute(
+        "UPDATE users SET name=?, email=?, profile=?, active=? WHERE id=?",
+        (name, email, profile, int(active), uid)
+    )
+    conn.commit()
+    conn.close()
+
+
+def inativar_user(uid):
+    conn = get_db()
+    conn.execute("UPDATE users SET active=0 WHERE id=?", (uid,))
+    conn.commit()
+    conn.close()
