@@ -16,7 +16,8 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Iterable, Optional
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "contratos.db")
+_local_db = os.path.join(os.path.dirname(os.path.dirname(__file__)), "contratos.db")
+DB_PATH = _local_db if os.access(os.path.dirname(_local_db) or ".", os.W_OK) else "/tmp/contratos.db"
 SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "schema.sql")
 
 

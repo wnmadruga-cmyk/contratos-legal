@@ -36,6 +36,7 @@ uploads/
 *.docx
 *.pdf
 *.json
+!vercel.json
 
 # Pastas de manuais e modelos locais
 manuais/

@@ -34,7 +34,8 @@ from pathlib import Path
 from typing import BinaryIO, Iterator
 
 
-UPLOAD_ROOT = Path(__file__).resolve().parent.parent / "uploads" / "leads"
+_local_uploads = Path(__file__).resolve().parent.parent / "uploads" / "leads"
+UPLOAD_ROOT = _local_uploads if os.access(str(_local_uploads.parent.parent), os.W_OK) else Path("/tmp/uploads/leads")
 
 
 def _safe_filename(name: str) -> str:
