@@ -315,6 +315,20 @@ def _seed_defaults() -> None:
                     )
                     stage_pos += 1
 
+        # Garante que os tipos de órgão existam (Vigilância, Bombeiro, Conselho)
+        for _code, _name, _color in [
+            ("vigilancia", "Vigilância Sanitária", "#8b5cf6"),
+            ("bombeiro",   "Bombeiro",              "#ef4444"),
+            ("conselho",   "Conselho de Classe",    "#f59e0b"),
+        ]:
+            if conn.execute(
+                "SELECT COUNT(*) FROM lead_types WHERE code=?", (_code,)
+            ).fetchone()[0] == 0:
+                conn.execute(
+                    "INSERT INTO lead_types (id,name,color,active,code) VALUES (?,?,?,1,?)",
+                    (new_id(), _name, _color, _code),
+                )
+
 
 # ---------------------------------------------------------------------------
 # Deadline computation (CNPJ, Nota Fiscal, Total)
